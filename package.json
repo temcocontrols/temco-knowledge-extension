@@ -1,0 +1,37 @@
+{
+  "name": "temco-knowledge-extension",
+  "displayName": "Temco Knowledge Studio",
+  "description": "Temco's internal platform for product technical content: keeps documentation and training in step with the code, with a local AI drafting the updates.",
+  "version": "0.0.1",
+  "publisher": "temcocontrols",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "temcoKnowledge.showStatus",
+        "title": "Temco Knowledge: Show Status"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "typescript": "^5.6.0"
+  }
+}
