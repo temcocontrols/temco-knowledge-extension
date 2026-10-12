@@ -13,14 +13,94 @@
     "Other"
   ],
   "main": "./out/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:temcoKnowledge.pages"
+  ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "temcoKnowledge",
+          "title": "Temco Knowledge",
+          "icon": "media/knowledge.svg"
+        }
+      ]
+    },
+    "views": {
+      "temcoKnowledge": [
+        {
+          "id": "temcoKnowledge.pages",
+          "name": "Content"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "temcoKnowledge.showStatus",
         "title": "Temco Knowledge: Show Status"
+      },
+      {
+        "command": "temcoKnowledge.validate",
+        "title": "Validate",
+        "icon": "$(check)"
+      },
+      {
+        "command": "temcoKnowledge.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "temcoKnowledge.openRegistry",
+        "title": "Open Registry",
+        "icon": "$(json)"
+      },
+      {
+        "command": "temcoKnowledge.openPage",
+        "title": "Open Page",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "temcoKnowledge.revealPage",
+        "title": "Reveal in Explorer",
+        "icon": "$(folder-opened)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "temcoKnowledge.validate",
+          "when": "view == temcoKnowledge.pages",
+          "group": "navigation@1"
+        },
+        {
+          "command": "temcoKnowledge.openRegistry",
+          "when": "view == temcoKnowledge.pages",
+          "group": "navigation@2"
+        },
+        {
+          "command": "temcoKnowledge.refresh",
+          "when": "view == temcoKnowledge.pages",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "temcoKnowledge.openPage",
+          "when": "view == temcoKnowledge.pages && viewItem == page",
+          "group": "inline"
+        },
+        {
+          "command": "temcoKnowledge.revealPage",
+          "when": "view == temcoKnowledge.pages && viewItem == page",
+          "group": "1_open@1"
+        },
+        {
+          "command": "temcoKnowledge.openRegistry",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|chapter|folder)$/",
+          "group": "1_open@2"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
