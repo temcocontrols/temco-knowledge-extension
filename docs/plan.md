@@ -55,9 +55,15 @@ different model later changes nothing else.
 | 2.2 | **The catalog and the downloader** — a list of runtimes and models to choose from, downloaded on request into a folder of the user's choosing, resumable, checksum-verified where the catalog pins one, removable | a model downloads once, survives a restart, and no model file is ever inside a repository | **done** 2026-10-13 |
 | 2.3 | **The runtime process** — the downloaded `llama-server` started on demand on a loopback port, health-checked before use, stopped when idle | the extension host never blocks; with nothing installed, every phase-1 feature is unaffected | **done** 2026-10-13 |
 | 2.4 | **The panel** — the `Temco Knowledge` view: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | the panel reads the open document and `registry.ts`, and holds no logic of its own | **done** 2026-10-13 |
-| 2.5 | **`Draft update`** — commit range from git (commits touching `docs/**` and the page's `code[]` globs), a versioned prompt file, the answer applied as a workspace edit | accepting is a diff, rejecting is `Ctrl+Z`, and the draft names its commit range and prompt version | next |
-| 2.6 | **`Ask the area`** — candidates from the area and tags, an answer that cites pages; low confidence returns search results instead of a synthesis; `stale` pages excluded or explicitly warned | every answer cites a page that exists, and a stale page is never cited silently | planned |
+| 2.5 | **`Draft update`** — commit range from git (commits touching the page's `code[]` globs, since its last review), prompts as versioned files, the answer applied as a workspace edit | accepting is a diff, rejecting is `Ctrl+Z`, and the draft names its commit range and prompt version | **done** 2026-10-13 |
+| 2.6 | **`Ask the area`** — candidates from the area and tags, an answer that cites pages; low confidence returns search results instead of a synthesis; `stale` pages excluded or explicitly warned | every answer cites a page that exists, and a stale page is never cited silently | next |
 | 2.7 | **Guardrails as code** — degradable, traceable, no secrets or customer data in prompts (commit metadata, paths and page text only), cost bounded | with the model deleted, every phase-1 feature and every command still works | planned |
+
+**The draft's range.** `src/ai/history.ts` reads `git log` for the page: the commits touching its `code` globs
+since its last review, capped at 40, commit metadata and file paths only — never file contents. No page declares
+a glob yet, so the range falls back to recent commits anywhere **and says so in its own label**; that label is
+printed on the diff and in the transcript beside the prompt version. The wording now lives in `prompts/*.md`
+(bump `PROMPT_VERSION` with it), so the instructions are reviewable text and they diff as text.
 
 **The panel, and what it is allowed to see.** `src/ai/panel.ts` renders the transcript and forwards the
 buttons; `src/ai/prompts.ts` holds the instructions, versioned as `PROMPT_VERSION`. A question carries the

@@ -71,7 +71,9 @@ malformed one is a **warning on that file** — the fix is to regenerate it in t
 because it hides nothing else.
 
 What the extension shows from them: a page's last change and headings in its tooltip, a `stale` marker on the
-page (description and icon), and a stale count in the repository and area tooltips plus the status report.
+page (description and icon), and a stale count in the repository and area tooltips plus the status report. The
+page's `code` globs are read from the same place, because that is what a `Draft update`'s commit range is read
+against.
 
 **`stale` is read, never computed here.** The verdict — a commit touched a path the page claims in `code`,
 after its last review — belongs to the product repo's generator (`05-content-and-registry.md` §4). Two answers

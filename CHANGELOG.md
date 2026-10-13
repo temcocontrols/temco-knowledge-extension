@@ -28,6 +28,11 @@
   on screen, by id, title and headings). Answers stream as they arrive, every draft names its prompt version,
   and with nothing installed the panel still opens and says what to download. What reaches the model is the
   page and its metadata — never another file.
+- **`Draft update` reads the change it is about.** `src/ai/history.ts` logs the commits touching the page's
+  `code` globs since its last review (capped at 40; commit metadata and file paths, never file contents), and
+  the range is printed beside the prompt version on the diff and in the transcript. No page declares a glob yet,
+  so the range falls back to recent commits anywhere and says so. The prompt wording moved into `prompts/*.md`,
+  where it is reviewable text — `PROMPT_VERSION` bumps with it.
 
 ## 0.0.1
 

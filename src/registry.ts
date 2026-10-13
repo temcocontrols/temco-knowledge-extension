@@ -75,6 +75,8 @@ export interface Provenance {
   updated: string | null;
   stale: boolean;
   headings: string[];
+  /** The code globs the page claims — what its staleness is judged against, and what a draft reads history for. */
+  code: string[];
 }
 
 export interface PageEntry {
@@ -383,6 +385,7 @@ interface IndexJson {
     git?: GitInfo | null;
     stale?: boolean;
     headings?: unknown[];
+    code?: unknown[];
   }[];
 }
 
@@ -407,7 +410,7 @@ async function loadProvenance(rootUri: vscode.Uri, problems: RootProblem[]): Pro
     if (existing) {
       return existing;
     }
-    const created: Provenance = { git: null, updated: null, stale: false, headings: [] };
+    const created: Provenance = { git: null, updated: null, stale: false, headings: [], code: [] };
     byId.set(id, created);
     return created;
   };
@@ -422,6 +425,7 @@ async function loadProvenance(rootUri: vscode.Uri, problems: RootProblem[]): Pro
     entry.updated = page.git?.date ?? null;
     entry.stale = page.stale === true;
     entry.headings = (page.headings ?? []).map(String).filter((heading) => heading.length > 0);
+    entry.code = (page.code ?? []).map(String).filter((glob) => glob.length > 0);
   }
 
   const meta = await readNeighbour<Record<string, PageMetaEntry | undefined>>(

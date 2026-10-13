@@ -1,12 +1,35 @@
-// The prompts, versioned with the code.
+// The prompts, as files the repository reviews and the extension ships.
 //
 // `12-ai-features.md` §5: prompts take commit metadata, paths and documentation text — nothing else. There is
 // no repository sweep here, no credential, no customer data, and no way for a page's prose to make the model
-// do something to another file. Every answer names the prompt version it came from, so a draft can be traced
-// to the instructions that produced it.
+// do something to another file. The wording lives in `prompts/*.md` so it is reviewable as text and diffs as
+// text; every answer names the version below, so a draft can be traced to the instructions behind it.
 
-/** Bumped whenever the wording below changes, so a draft can be traced to the instructions behind it. */
-export const PROMPT_VERSION = 'ai-v1';
+import * as fs from 'fs';
+import * as vscode from 'vscode';
+
+/** Bumped whenever a file under `prompts/` changes, so a draft can be traced to the instructions behind it. */
+export const PROMPT_VERSION = 'ai-v2';
+
+const TEMPLATE_FOLDER = 'prompts';
+const loaded = new Map<string, string>();
+
+/** The prompt text, read once. A missing file is a packaging bug and says so. */
+function template(context: vscode.ExtensionContext, name: string): string {
+  const cached = loaded.get(name);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const file = vscode.Uri.joinPath(context.extensionUri, TEMPLATE_FOLDER, `${name}.md`).fsPath;
+  const text = fs.readFileSync(file, 'utf8');
+  loaded.set(name, text);
+  return text;
+}
+
+/** `{{placeholder}}` substitution. An unknown placeholder is left visible rather than silently blanked. */
+function fill(text: string, values: Record<string, string>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (whole: string, key: string) => values[key] ?? whole);
+}
 
 /** Everything a prompt is allowed to see about the page in front of the user. */
 export interface PageContext {
@@ -31,101 +54,89 @@ export interface Candidate {
   headings: string[];
 }
 
-const HOUSE_RULES = [
-  'You help maintain Temco product documentation, which is Markdown with no front matter.',
-  'Use ONLY the material given in this conversation. If it does not contain the answer, say so plainly.',
-  'Never invent an API, a setting, a screen label, a version number or a menu path.',
-  'Prefer short, declarative sentences. No marketing language, no hedging.',
-  'The pages are hard-wrapped; keep the existing line breaks and structure when you propose text.',
-];
-
-export function systemPrompt(page: PageContext | undefined): string {
-  const lines = [...HOUSE_RULES];
-  if (page) {
+/** The lines the system prompt adds about the page, or about there being none. */
+function pageLines(page: PageContext | undefined): string {
+  if (!page) {
+    return 'No page is open, so answer from general knowledge of Markdown and documentation practice only.';
+  }
+  const lines = [
+    `The page in front of the user is "${page.title}" (id ${page.id}, area ${page.area}, owner ${page.owner || 'unknown'}).`,
+    `Its last change was ${page.updated ?? 'unknown'}, its last human review ${page.reviewed ?? 'never'}.`,
+  ];
+  if (page.stale) {
     lines.push(
-      `The page in front of the user is "${page.title}" (id ${page.id}, area ${page.area}, owner ${page.owner || 'unknown'}).`,
-      `Its last change was ${page.updated ?? 'unknown'}, its last human review ${page.reviewed ?? 'never'}.`
+      'This page is flagged stale: the code it documents changed after that review. Say so when it matters.'
     );
-    if (page.stale) {
-      lines.push(
-        'This page is flagged stale: the code it documents changed after that review. Say so when it matters.'
-      );
-    }
-  } else {
-    lines.push('No page is open, so answer from general knowledge of Markdown and documentation practice only.');
   }
   return lines.join('\n');
 }
 
+function facts(page: PageContext): Record<string, string> {
+  return {
+    path: page.path,
+    title: page.title,
+    area: page.area,
+    chapter: page.chapter,
+    headings: page.headings.join(' · ') || '(none)',
+    updated: page.updated ?? 'unknown',
+    reviewed: page.reviewed ?? 'never',
+    body: page.body.trim(),
+  };
+}
+
+export function systemPrompt(context: vscode.ExtensionContext, page: PageContext | undefined): string {
+  return fill(template(context, 'system'), { page: pageLines(page) });
+}
+
 /** A question about the page on screen. */
-export function askPrompt(question: string, page: PageContext | undefined): string {
-  return [
-    page ? `# Page: ${page.path}\n\n${page.body}` : '# Page\n\n(none is open)',
-    '',
-    '# Question',
-    '',
+export function askPrompt(
+  context: vscode.ExtensionContext,
+  question: string,
+  page: PageContext | undefined
+): string {
+  return fill(template(context, 'ask'), {
+    path: page?.path ?? '(no page is open)',
+    body: page?.body.trim() ?? '',
     question,
-    '',
-    page
+    closing: page
       ? 'Answer in a few sentences. If the page does not answer it, say which page or section would.'
       : 'Answer in a few sentences.',
-  ].join('\n');
+  });
 }
 
 /**
- * A proposed update to the whole page.
+ * A proposed update to the whole page, against the commits that prompted it.
  *
  * The whole page, not a fragment: a diff is what a maintainer reviews, and a partial answer would leave the
  * reviewer reconciling two documents by hand.
  */
-export function draftPrompt(page: PageContext, changes: string): string {
-  return [
-    `# Page: ${page.path}`,
-    '',
-    `Title: ${page.title}`,
-    `Area and chapter: ${page.area} / ${page.chapter}`,
-    `Headings: ${page.headings.join(' · ') || '(none)'}`,
-    `Last change: ${page.updated ?? 'unknown'} · last review: ${page.reviewed ?? 'never'}`,
-    '',
-    '# What changed in the code',
-    '',
-    changes,
-    '',
-    '# The page as it stands',
-    '',
-    page.body,
-    '',
-    '# What to return',
-    '',
-    'Return the complete new text of the page, and nothing else: no explanation, no code fence around it,',
-    'no front matter. Keep every heading, table and line break that does not have to change, and change only',
-    'what the code change requires.',
-  ].join('\n');
+export function draftPrompt(
+  context: vscode.ExtensionContext,
+  page: PageContext,
+  changes: string,
+  note: string
+): string {
+  const what = note.trim().length > 0 ? `${changes}\n\n# What the maintainer says\n\n${note.trim()}` : changes;
+  return fill(template(context, 'draft'), { ...facts(page), changes: what });
 }
 
 /** A question that spans the pages of one area. */
 export function areaPrompt(
+  context: vscode.ExtensionContext,
   question: string,
   page: PageContext | undefined,
   candidates: readonly Candidate[]
 ): string {
   const list = candidates
-    .map((candidate) => `- ${candidate.id} — ${candidate.title}${candidate.headings.length ? `: ${candidate.headings.join(', ')}` : ''}`)
+    .map(
+      (candidate) =>
+        `- ${candidate.id} — ${candidate.title}${candidate.headings.length ? `: ${candidate.headings.join(', ')}` : ''}`
+    )
     .join('\n');
-  return [
-    page ? `# The page on screen\n\n${page.path}\n\n${page.body}` : '# The page on screen\n\n(none is open)',
-    '',
-    '# Other pages in this documentation set',
-    '',
-    list || '(none)',
-    '',
-    '# Question',
-    '',
+  return fill(template(context, 'area'), {
+    path: page?.path ?? '(no page is open)',
+    body: page?.body.trim() ?? '',
+    candidates: list || '(none)',
     question,
-    '',
-    '# What to return',
-    '',
-    'Answer in a few sentences, and name the page ids you used, like `t3000/features/trendlogs`.',
-    'If the pages you were given cannot answer it, say which page ids should be looked at instead.',
-  ].join('\n');
+  });
 }

@@ -60,6 +60,7 @@ src/ai/              catalog.ts (what can be downloaded), install.ts (download/v
                      panel.ts (the AI panel), commands.ts (the model list + AI status)
 media/               knowledge.svg (the activity-bar icon); ai-panel.js/.css (the AI panel)
 media/knowledge.svg  the activity-bar icon
+prompts/             the instruction text the AI receives (system.md, ask.md, draft.md, area.md)
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
 

@@ -16,6 +16,7 @@ import {
   draftPrompt,
   systemPrompt,
 } from './prompts';
+import { ChangeRange, readChangeRange } from './history';
 import { ChatMessage, aiStatus, complete } from './runtime';
 
 export const AI_VIEW_ID = 'temcoKnowledge.ai';
@@ -134,6 +135,8 @@ export class AiPanel implements vscode.WebviewViewProvider {
     }
 
     const page = await this.pageContext(entry);
+    // A draft is *about a change*, so the change is read before anything is asked.
+    const range = kind === 'draft' && entry ? await this.changeRange(entry) : undefined;
     this.busy = true;
     this.refresh();
     this.post({ type: 'user', text: this.label(kind, question) });
@@ -144,7 +147,7 @@ export class AiPanel implements vscode.WebviewViewProvider {
     this.cancelling = tokenSource;
     let streamed = '';
     try {
-      const messages = this.messages(kind, question, page, entry);
+      const messages = this.messages(kind, question, page, entry, range);
       const answer = await complete(this.context, messages, {
         onToken: (piece) => {
           streamed += piece;
@@ -157,7 +160,7 @@ export class AiPanel implements vscode.WebviewViewProvider {
         this.post({ type: 'note', text: 'The model returned nothing. Try again, or a different model.' });
       } else if (kind === 'draft') {
         this.remember(question, text);
-        await this.showDraft(text, entry);
+        await this.showDraft(text, entry, range);
       } else {
         this.remember(question, text);
       }
@@ -173,22 +176,42 @@ export class AiPanel implements vscode.WebviewViewProvider {
     }
   }
 
+  /** The commits that prompted this draft — or a plain statement that none could be read. */
+  private async changeRange(entry: PageEntry): Promise<ChangeRange> {
+    const root = this.rootOf(entry);
+    if (!root) {
+      return {
+        commits: 0,
+        label: 'no range — the page is not inside an open repository',
+        text: '(no change history was read)',
+      };
+    }
+    return readChangeRange(root, entry);
+  }
+
   /** A draft is shown against the page it came from, never written straight into it. */
-  private async showDraft(text: string, entry: PageEntry | undefined): Promise<void> {
+  private async showDraft(
+    text: string,
+    entry: PageEntry | undefined,
+    range: ChangeRange | undefined
+  ): Promise<void> {
     if (!entry) {
       return;
     }
     this.draft = { page: entry, text };
     const draft = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
+    const commits = range ? `, ${range.commits} commit${range.commits === 1 ? '' : 's'}` : '';
     await vscode.commands.executeCommand(
       'vscode.diff',
       entry.uri,
       draft.uri,
-      `${entry.title} ↔ draft (${PROMPT_VERSION})`
+      `${entry.title} ↔ draft (${PROMPT_VERSION}${commits})`
     );
     this.post({
       type: 'note',
-      text: `Draft from ${PROMPT_VERSION}. Read the diff: Apply replaces the whole page, and one Ctrl+Z takes it back.`,
+      text:
+        `Draft from ${PROMPT_VERSION}${range ? ` · ${range.label}` : ''}. ` +
+        'Read the diff: Apply replaces the whole page, and one Ctrl+Z takes it back.',
     });
   }
 
@@ -229,25 +252,34 @@ export class AiPanel implements vscode.WebviewViewProvider {
     kind: 'ask' | 'area' | 'draft',
     question: string,
     page: PageContext | undefined,
-    entry: PageEntry | undefined
+    entry: PageEntry | undefined,
+    range: ChangeRange | undefined
   ): ChatMessage[] {
-    const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt(page) }];
+    const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt(this.context, page) }];
     for (const turn of this.turns.slice(-HISTORY_TURNS)) {
       messages.push({ role: turn.role, content: turn.text });
     }
     switch (kind) {
       case 'ask':
-        messages.push({ role: 'user', content: askPrompt(question, page) });
+        messages.push({ role: 'user', content: askPrompt(this.context, question, page) });
         break;
       case 'area':
         messages.push({
           role: 'user',
-          content: areaPrompt(question, page, this.candidates(entry)),
+          content: areaPrompt(this.context, question, page, this.candidates(entry)),
         });
         break;
       case 'draft':
         if (page) {
-          messages.push({ role: 'user', content: draftPrompt(page, question || DEFAULT_DRAFT_NOTE) });
+          messages.push({
+            role: 'user',
+            content: draftPrompt(
+              this.context,
+              page,
+              range?.text ?? '(no change history was read)',
+              question || DEFAULT_DRAFT_NOTE
+            ),
+          });
         }
         break;
     }
