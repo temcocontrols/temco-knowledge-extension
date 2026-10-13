@@ -13,6 +13,7 @@
 | `src/ai/runtime.ts` | the local server process: started on demand on a loopback port, health-checked, stopped when idle — and the single `complete()` call everything else uses |
 | `src/ai/history.ts` | the commits a draft is about: `git log` over the page's `code` globs since its last review, metadata and paths only. Never throws |
 | `src/ai/prompts.ts` | loads `prompts/*.md` and fills them in: the house rules, the question, the draft, the area. The only text that may reach the model |
+| `src/ai/citations.ts` | what an answer pointed at: the ids that resolve, the ids that do not, and the plain term search behind a low-confidence fallback |
 | `src/ai/panel.ts` | the `Temco Knowledge` panel: chat about the open page, `Draft update` as a diff, `Ask the area`, and the model line. Decides nothing itself |
 | `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder, and the AI's status |
 
@@ -60,6 +61,9 @@ Temco Knowledge                                     (panel: the AI, bottom area)
 - **What reaches the model is fixed.** The page's text and metadata, and for an area question the ids, titles
   and headings of its neighbours. No other file, no repository sweep, no credential.
 - **Every draft names its prompt version**, so a draft can be traced to the instructions that produced it.
+- **An answer's citations are checked.** A page it names becomes a chip that opens it and is dashed when the
+  page is stale; a name that is not a page is reported rather than believed; and an area answer that named
+  nothing is replaced by search results instead of a synthesis.
 - **With nothing installed the panel still opens** and says what to download, so the extension never looks
   broken — the AI is optional the whole way down.
 

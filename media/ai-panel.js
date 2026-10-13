@@ -49,6 +49,22 @@
     input.disabled = false;
   }
 
+  function chips(items) {
+    const row = document.createElement('div');
+    row.className = 'chips';
+    for (const item of items) {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip' + (item.stale ? ' stale' : '');
+      chip.textContent = item.id.split('/').pop() + (item.stale ? ' · stale' : '');
+      chip.title = (item.stale ? 'stale · ' : '') + item.id + ' — ' + item.title;
+      chip.addEventListener('click', () => vscode.postMessage({ type: 'open', id: item.id }));
+      row.appendChild(chip);
+    }
+    transcript.appendChild(row);
+    scroll(true);
+  }
+
   function state(next) {
     where.textContent = next.page
       ? next.page.title + (next.page.stale ? ' · stale' : '')
@@ -124,6 +140,13 @@
         return;
       case 'note':
         turn('note', message.text);
+        return;
+      case 'citations':
+        chips(message.items || []);
+        return;
+      case 'results':
+        turn('note', message.text || '');
+        chips(message.items || []);
         return;
       case 'error':
         turn('error', message.text);

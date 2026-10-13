@@ -16,6 +16,7 @@ import {
   draftPrompt,
   systemPrompt,
 } from './prompts';
+import { resolveCitations, searchPages } from './citations';
 import { ChangeRange, readChangeRange } from './history';
 import { ChatMessage, aiStatus, complete } from './runtime';
 
@@ -77,7 +78,7 @@ export class AiPanel implements vscode.WebviewViewProvider {
   }
 
   private async receive(message: unknown): Promise<void> {
-    const data = message as { type?: string; text?: string };
+    const data = message as { type?: string; text?: string; id?: string };
     switch (data.type) {
       case 'ask':
         await this.run('ask', data.text?.trim() ?? '');
@@ -96,6 +97,16 @@ export class AiPanel implements vscode.WebviewViewProvider {
         }
         if (question.length > 0) {
           await this.run('area', question);
+        }
+        return;
+      }
+      case 'open': {
+        const wanted = data.id ?? '';
+        const page = this.roots()
+          .flatMap((root) => collectPages(root))
+          .find((entry) => entry.id === wanted);
+        if (page) {
+          await vscode.window.showTextDocument(page.uri, { preview: false });
         }
         return;
       }
@@ -163,6 +174,7 @@ export class AiPanel implements vscode.WebviewViewProvider {
         await this.showDraft(text, entry, range);
       } else {
         this.remember(question, text);
+        this.verify(text, question, kind);
       }
     } catch (error) {
       this.post({ type: 'error', text: messageOf(error) });
@@ -301,6 +313,54 @@ export class AiPanel implements vscode.WebviewViewProvider {
     this.turns.push({ role: 'user', text: question }, { role: 'assistant', text: answer });
   }
 
+  /**
+   * What the answer pointed at.
+   *
+   * A name that is not a page is reported rather than believed. And when an area answer cites nothing at all,
+   * the pages whose words match the question are offered instead of the synthesis — the design's rule for a
+   * low-confidence answer, and the honest thing to do with a small model.
+   */
+  private verify(text: string, question: string, kind: 'ask' | 'area' | 'draft'): void {
+    if (kind === 'draft') {
+      return;
+    }
+    const pages = this.roots().flatMap((root) => collectPages(root));
+    const { known, unknown } = resolveCitations(text, pages);
+
+    if (known.length > 0) {
+      this.post({
+        type: 'citations',
+        items: known.map((page) => ({
+          id: page.id,
+          title: page.title,
+          stale: page.provenance?.stale === true,
+        })),
+      });
+    }
+    if (unknown.length > 0) {
+      this.post({
+        type: 'note',
+        text:
+          `${unknown.join(', ')} ${unknown.length === 1 ? 'is not a page' : 'are not pages'} in this ` +
+          'documentation set. Treat anything they claim with suspicion.',
+      });
+    }
+    if (kind === 'area' && known.length === 0) {
+      const results = searchPages(pages, question, 5);
+      if (results.length > 0) {
+        this.post({
+          type: 'results',
+          text: 'That answer named no page, so here are the pages whose words match the question:',
+          items: results.map((page) => ({
+            id: page.id,
+            title: page.title,
+            stale: page.provenance?.stale === true,
+          })),
+        });
+      }
+    }
+  }
+
   /** The page's own chapter first, then the rest of its area: the pages a question is most likely about. */
   private candidates(entry: PageEntry | undefined): Candidate[] {
     if (!entry) {
@@ -320,6 +380,7 @@ export class AiPanel implements vscode.WebviewViewProvider {
         id: page.id,
         title: page.title,
         headings: page.provenance?.headings ?? [],
+        stale: page.provenance?.stale === true,
       }));
   }
 

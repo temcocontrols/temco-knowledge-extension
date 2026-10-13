@@ -57,6 +57,7 @@ src/diagnostics.ts   turns issues into Problems, in the file that has to be fixe
 src/extension.ts     activation: view, status bar, commands, file watcher
 src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack),
                      runtime.ts (the local server process), prompts.ts (the versioned instructions),
+                     history.ts (the commit range), citations.ts (what an answer pointed at),
                      panel.ts (the AI panel), commands.ts (the model list + AI status)
 media/               knowledge.svg (the activity-bar icon); ai-panel.js/.css (the AI panel)
 media/knowledge.svg  the activity-bar icon

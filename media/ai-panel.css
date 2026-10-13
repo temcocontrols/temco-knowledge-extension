@@ -128,3 +128,23 @@ button:disabled {
 .hidden {
   display: none;
 }
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--vscode-panel-border);
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+}
+
+.chip.stale {
+  border-style: dashed;
+  color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+}

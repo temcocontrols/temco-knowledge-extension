@@ -33,6 +33,10 @@
   the range is printed beside the prompt version on the diff and in the transcript. No page declares a glob yet,
   so the range falls back to recent commits anywhere and says so. The prompt wording moved into `prompts/*.md`,
   where it is reviewable text — `PROMPT_VERSION` bumps with it.
+- **Citations are checked, not believed.** An answer that names a page turns it into a chip that opens it —
+  dashed when the page is stale — and a name that is not a page is reported as a suspicion. An *Ask the area*
+  answer that named no page at all is replaced by search results over titles, headings, keywords and tags,
+  rather than a synthesis nothing supports.
 
 ## 0.0.1
 

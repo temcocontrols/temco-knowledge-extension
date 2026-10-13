@@ -90,6 +90,9 @@ export interface PageEntry {
   ship: boolean;
   owner: string;
   reviewed: string | null;
+  /** Search facets from the registry: what the page is about, in the maintainer's own words. */
+  tags: string[];
+  keywords: string[];
   uri: vscode.Uri;
   exists: boolean;
   issues: Issue[];
@@ -266,6 +269,8 @@ export async function loadDocsRoot(folder: vscode.WorkspaceFolder): Promise<Docs
       ship: raw.ship !== false,
       owner: raw.owner ?? '',
       reviewed: raw.reviewed ?? null,
+      tags: raw.tags ?? [],
+      keywords: raw.keywords ?? [],
       uri,
       exists,
       issues,

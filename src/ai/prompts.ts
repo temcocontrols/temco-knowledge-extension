@@ -52,6 +52,8 @@ export interface Candidate {
   id: string;
   title: string;
   headings: string[];
+  /** The generator's verdict: the code this page documents moved on after its last review. */
+  stale: boolean;
 }
 
 /** The lines the system prompt adds about the page, or about there being none. */
@@ -130,7 +132,9 @@ export function areaPrompt(
   const list = candidates
     .map(
       (candidate) =>
-        `- ${candidate.id} — ${candidate.title}${candidate.headings.length ? `: ${candidate.headings.join(', ')}` : ''}`
+        `- ${candidate.id} — ${candidate.title}${candidate.stale ? ' (stale)' : ''}${
+          candidate.headings.length ? `: ${candidate.headings.join(', ')}` : ''
+        }`
     )
     .join('\n');
   return fill(template(context, 'area'), {
