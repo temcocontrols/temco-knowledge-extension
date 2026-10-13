@@ -7,7 +7,7 @@
 // (`07-offline-pdf-chm.md`), and a build that reports success without producing a file has not succeeded.
 //
 // One thing this deliberately never does: run the deploying form of the help build. That form copies the CHM
-// into a T3000 installation, and building is not shipping.
+// into a product installation, and building is not shipping.
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -54,7 +54,7 @@ export function registerBuildCommands(
         void vscode.window.showWarningMessage(
           scripts['build:help']
             ? 'Temco Knowledge: this repository only has the deploying help build (`build:help`), which copies the ' +
-              'CHM into a T3000 installation. Nothing was run — that act is not this extension\'s to make.'
+              'CHM into a product installation. Nothing was run — that act is not this extension\'s to make.'
             : 'Temco Knowledge: this repository has no `build:help:dry` script, so nothing was run.'
         );
         return;

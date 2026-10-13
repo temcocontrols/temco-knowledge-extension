@@ -6,6 +6,13 @@
   "publisher": "temcocontrols",
   "private": true,
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/temcocontrols/temco-knowledge-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/temcocontrols/temco-knowledge-extension/issues"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -25,20 +32,31 @@
           "title": "Temco Knowledge",
           "icon": "media/knowledge.svg"
         }
+      ],
+      "panel": [
+        {
+          "id": "temcoKnowledgePanel",
+          "title": "Temco Knowledge",
+          "icon": "media/knowledge.svg"
+        }
       ]
     },
     "views": {
       "temcoKnowledge": [
         {
           "id": "temcoKnowledge.pages",
-          "name": "Content"
+          "name": "Workspace"
         },
         {
-          "id": "temcoKnowledge.dashboard",
-          "name": "Organisation"
+          "id": "temcoKnowledge.work",
+          "name": "Work"
+        },
+        {
+          "id": "temcoKnowledge.library",
+          "name": "Library"
         }
       ],
-      "panel": [
+      "temcoKnowledgePanel": [
         {
           "type": "webview",
           "id": "temcoKnowledge.ai",
@@ -60,6 +78,11 @@
         "command": "temcoKnowledge.refresh",
         "title": "Refresh",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "temcoKnowledge.home",
+        "title": "Home",
+        "icon": "$(home)"
       },
       {
         "command": "temcoKnowledge.openRegistry",
@@ -107,57 +130,52 @@
         "icon": "$(book)"
       },
       {
-        "command": "temcoKnowledge.dashboard",
-        "title": "Documentation Dashboard",
-        "icon": "$(organization)"
+        "command": "temcoKnowledge.stalenessReport",
+        "title": "Documentation Owed",
+        "icon": "$(report)"
       },
       {
-        "command": "temcoKnowledge.dashboardRefresh",
-        "title": "Documentation Dashboard: Refresh",
-        "icon": "$(refresh)"
+        "command": "temcoKnowledge.startRegistry",
+        "title": "Start a Registry",
+        "icon": "$(new-file)"
       },
       {
-        "command": "temcoKnowledge.setGithubToken",
-        "title": "Set a GitHub Token",
-        "icon": "$(key)"
+        "command": "temcoKnowledge.feedback",
+        "title": "Feedback by Owner",
+        "icon": "$(comment-discussion)"
       },
       {
-        "command": "temcoKnowledge.openRepository",
-        "title": "Open Repository",
-        "icon": "$(link-external)"
+        "command": "temcoKnowledge.catalog",
+        "title": "The Catalog",
+        "icon": "$(database)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "temcoKnowledge.home",
+          "when": "view == temcoKnowledge.pages",
+          "group": "navigation@0"
+        },
         {
           "command": "temcoKnowledge.validate",
           "when": "view == temcoKnowledge.pages",
           "group": "navigation@1"
         },
         {
-          "command": "temcoKnowledge.dashboard",
-          "when": "view == temcoKnowledge.dashboard",
-          "group": "navigation@1"
-        },
-        {
-          "command": "temcoKnowledge.dashboardRefresh",
-          "when": "view == temcoKnowledge.dashboard",
-          "group": "navigation@2"
-        },
-        {
-          "command": "temcoKnowledge.openRegistry",
-          "when": "view == temcoKnowledge.pages",
-          "group": "navigation@2"
-        },
-        {
           "command": "temcoKnowledge.refresh",
           "when": "view == temcoKnowledge.pages",
-          "group": "navigation@3"
+          "group": "navigation@2"
         },
         {
-          "command": "temcoKnowledge.models",
-          "when": "view == temcoKnowledge.pages",
-          "group": "navigation@4"
+          "command": "temcoKnowledge.stalenessReport",
+          "when": "view == temcoKnowledge.work",
+          "group": "navigation@0"
+        },
+        {
+          "command": "temcoKnowledge.catalog",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@0"
         }
       ],
       "view/item/context": [
@@ -178,6 +196,20 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "temcoKnowledge.pages",
+        "contents": "No documentation folder is open.\n\nThe pages, the faults and the totals of any project you open here appear beside the code they document."
+      },
+      {
+        "view": "temcoKnowledge.work",
+        "contents": "Nothing needs attention.\n\nThis fills in as projects are opened and changed: pages whose file is missing, pages with no owner, pages never reviewed, and changes the application has not shown you yet."
+      },
+      {
+        "view": "temcoKnowledge.library",
+        "contents": "Nothing recorded yet.\n\nA source is read where it already lives: a project at a branch you choose, a folder on this machine, or an archive. A document is what you create and version — one help set, built into a CHM, a PDF or a site."
+      }
+    ],
     "configuration": {
       "title": "Temco Knowledge",
       "properties": {
@@ -207,10 +239,15 @@
           "minimum": 0,
           "markdownDescription": "How long the local server may sit unused before it is stopped and its memory released. `0` keeps it running until the window closes."
         },
-        "temcoKnowledge.dashboard.owner": {
+        "temcoKnowledge.home.openOnStart": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Open the platform's home page when the extension is activated. Turn it off if you would rather it never opens a tab by itself."
+        },
+        "temcoKnowledge.organisation": {
           "type": "string",
           "default": "temcocontrols",
-          "markdownDescription": "The GitHub organisation the dashboard reads. Its repositories are listed and each one's `docs/help/registry.json` counted — no clone, no build."
+          "markdownDescription": "The GitHub organisation the dashboard links to for a starting point. Nothing is read from it automatically."
         }
       }
     }

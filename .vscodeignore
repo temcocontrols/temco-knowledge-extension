@@ -1,6 +1,15 @@
+# What the .vsix carries: `out/` (compiled), `prompts/` (read at run time) and `media/` (icon, panel).
+# Those three must stay. Everything below is source, repository documentation or tooling.
+#
+# `node_modules` is deliberately not listed: vsce excludes development dependencies by itself, and if this
+# extension ever gains a runtime dependency, that dependency has to ship.
 .vscode/**
+.github/**
 src/**
+docs/**
 **/*.map
 tsconfig.json
+package-lock.json
 .gitignore
 .editorconfig
+.vscodeignore

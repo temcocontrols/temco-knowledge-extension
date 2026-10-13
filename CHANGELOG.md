@@ -46,16 +46,47 @@
   then report the artifacts as path, size and time. Success is a file that did not exist before and does now,
   because the CHM build's exit code cannot be trusted. The deploying help build is refused with a reason rather
   than run, since it copies the CHM into a T3000 installation.
-- **The organisation dashboard, read over the API.** *Documentation Dashboard* lists an organisation's
-  repositories, reads each `docs/help/registry.json` and the last commit touching `docs/`, and writes repository,
-  pages, owner, changed and state to the output channel — cached for an hour, with *Refresh* to pass the cache,
-  and *Set a GitHub Token* storing a token in secret storage (never in a setting or a file). Unauthenticated it
-  stops part-way and names GitHub's own limit; a remote scan reports the gaps the registry alone can show.
-- **The Organisation view.** A second view in the same container, with two sources in one vocabulary: the folders
-  you have open (measured here — no network, and the checks see the files themselves) and the organisation read
-  from GitHub (cached; a floor, because a remote reader cannot see files). A repository that needs attention
-  expands into the reasons to act on it, and each row's tooltip says which source it came from. A tree rather
-  than `app-layout.md`'s table, since VS Code has no table view — the columns became the description and tooltip.
+- **The home page, and it opens by itself.** Activating the extension now shows *Temco Knowledge* — the
+  platform's entry point: documents, sources, the folders this editor has open, what the platform noticed and
+  has not shown yet, and where its memory is kept. It opens as a page in the editor area, every action is a
+  `command:` link (no scripts, nothing loaded from anywhere), and `temcoKnowledge.home.openOnStart` turns it
+  off. Nothing on it is specific to a product: the lists come from the catalog, and the folders are whatever
+  is open. Its queries are exercised against a real database, including a document with no sources and no
+  build still appearing in the list.
+- **The catalog exists (R1).** The platform's memory: a `catalog.db` in the extension's own storage with the
+  tables the design names — sources, documents, doc_sources, recipes, builds, artifacts, commits, commit_pages,
+  pages, scans, events — and a `node:sqlite` store that needs no dependency, since the engine ships with the
+  extension host. Where that built-in is missing, the store says so in words at the point of use instead of
+  failing activation, and a database written by a newer schema is refused rather than half-read. *The Catalog*
+  reports the file, the schema version and a row count per table. Verified by applying the schema to a real
+  database: 12 tables, idempotent, inserts and the document↔source join exercised.
+- **Phase 4 withdrawn: the dashboard is not ours.** An organisation read over the GitHub API and an Organisation
+  view were built here, then removed on re-reading the design. `00-architecture.md` puts the dashboard on the
+  **site** — a generated static page at `/docs/_admin/` carrying coverage, stale by owner, docs-owed, unowned,
+  unreviewed, broken links, feedback and the health score, noindex and never shipped, built by the product
+  repository's own pipeline (`13-implementation-plan.md` step 1.19) — and its rows deep-link *into* the editor.
+  What was here answered that same question more weakly (repository-level facts from the API, none of the
+  page-level health) and in a second place, which is the duplicate the plan's first rule exists to prevent.
+  `src/dashboard.ts`, `src/dashboardView.ts`, the view, its four commands and its two settings are deleted, and
+  nothing under `_admin/` or `_edit/` is written at all. *Start a Registry* survives as the Content view's empty
+  state, which is where a folder with no registry actually starts.
+- **Documentation Owed.** A report of what needs attention, grouped by owner: stale pages and faulty ones, with
+  the reasons in the words of the fix, and counts — not lists — for the pages that have merely never been
+  reviewed. It opens as an untitled Markdown document, so producing a report writes nothing. The *cadence* stays
+  in the product repo's CI (`11-review-and-cicd.md` §2): an editor extension has no scheduler.
+- **The last two steps.** *Start a Registry* creates the smallest valid `docs/help/registry.json` in an open
+  folder that has none, after a confirmation, and refuses a repository that is not open — starting one there would
+  be a commit made through the API. *Feedback by Owner* reads each repository's `docs/help/feedback.json`, routes
+  every row to its page's owner and calls out the ones waiting over 30 days (the file shape is a proposal awaiting
+  the docs owner's word). The `/_admin/` page writer that joined them was withdrawn: see phase 4 above.
+- **Where the commands live.** *Feedback by Owner* is a button on the Content view's title beside *Validate*,
+  *Open Registry*, *Refresh*, *Models and Runtime* and *Documentation Owed*, and *Start a Registry* is the row
+  the Content view shows when a folder has no registry — instead of a sentence telling you to go and find one.
+- **The AI view was landing in the Explorer.** It was contributed to a container named `panel`, which is not a
+  container — VS Code said so on every activation and put the view in the Explorer instead. It now lives in a
+  contributed panel container (`temcoKnowledgePanel`) — docked on the right by the workbench, since VS Code has
+  no contribution point that places a container there — where
+  `app-layout.md` draws it.
 
 ## 0.0.1
 

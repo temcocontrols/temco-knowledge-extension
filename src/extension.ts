@@ -9,11 +9,15 @@ import { registerAiCommands } from './ai/commands';
 import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
 import { registerBuildCommands } from './builds';
-import { registerDashboardCommands } from './dashboard';
-import { DASHBOARD_VIEW_ID, DashboardView, openRepository } from './dashboardView';
+import { registerCatalogCommands } from './catalog/commands';
 import { publishDiagnostics } from './diagnostics';
+import { registerFeedbackCommands } from './feedback';
+import { HomePanel } from './home';
+import { registerReportCommands } from './report';
+import { registerScaffoldCommands } from './scaffold';
 import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
 import { KnowledgeNode, KnowledgeTreeProvider, pageFromNode } from './tree';
+import { registerSectionViews } from './views';
 
 const OUTPUT_NAME = 'Temco Knowledge';
 const VIEW_ID = 'temcoKnowledge.pages';
@@ -48,13 +52,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeActiveTextEditor(() => panel.refresh())
   );
 
-  const dashboard = new DashboardView(context, () => roots);
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider(DASHBOARD_VIEW_ID, dashboard),
-    vscode.commands.registerCommand('temcoKnowledge.openRepository', (node?: unknown) =>
-      openRepository(node)
-    )
-  );
+  // The home page: the platform's own entry point, and the one surface that is not about a folder.
+  const home = new HomePanel(context, () => roots);
+
+  // The other two sections of the sidebar: what needs doing, and what it reads and produces.
+  const sections = registerSectionViews(context, () => roots);
 
   const refresh = async (): Promise<void> => {
     const broken: BrokenRegistry[] = [];
@@ -83,7 +85,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     updateStatus(status, roots, broken);
     panel.refresh();
-    dashboard.refresh();
+    home.refresh();
+    sections.refresh();
   };
 
   const report = async (): Promise<void> => {
@@ -126,6 +129,7 @@ export function activate(context: vscode.ExtensionContext): void {
   };
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('temcoKnowledge.home', () => home.open()),
     vscode.commands.registerCommand('temcoKnowledge.showStatus', report),
     vscode.commands.registerCommand('temcoKnowledge.validate', report),
     vscode.commands.registerCommand('temcoKnowledge.refresh', refresh),
@@ -192,7 +196,16 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerAiCommands(context);
   registerBuildCommands(context, () => roots, output);
-  registerDashboardCommands(context, output, dashboard);
+  registerReportCommands(context, () => roots);
+  registerScaffoldCommands(context);
+  registerFeedbackCommands(context, () => roots);
+  registerCatalogCommands(context, output);
+
+  // Opening the extension shows the platform's home page — it is the first thing a person should see. It can
+  // be turned off, because it opens a tab, and a tab is not always wanted.
+  if (vscode.workspace.getConfiguration('temcoKnowledge').get<boolean>('home.openOnStart', true)) {
+    home.open();
+  }
 
   void refresh();
 }

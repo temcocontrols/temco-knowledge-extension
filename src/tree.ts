@@ -47,19 +47,13 @@ class GapsNode {
   constructor(readonly count: number) {}
 }
 
-class MessageNode {
-  readonly kind = 'message';
-  constructor(readonly text: string, readonly icon?: string) {}
-}
-
 export type KnowledgeNode =
   | FolderNode
   | AreaNode
   | ChapterNode
   | PageNode
   | IssueNode
-  | GapsNode
-  | MessageNode;
+  | GapsNode;
 
 export function pageFromNode(node: KnowledgeNode | undefined): PageNode | undefined {
   return node?.kind === 'page' ? node : undefined;
@@ -98,13 +92,6 @@ export class KnowledgeTreeProvider implements vscode.TreeDataProvider<KnowledgeN
         item.tooltip = 'Every page with a structural problem, across all open repositories.';
         return item;
       }
-      case 'message': {
-        const item = new vscode.TreeItem(node.text, vscode.TreeItemCollapsibleState.None);
-        if (node.icon) {
-          item.iconPath = new vscode.ThemeIcon(node.icon);
-        }
-        return item;
-      }
     }
   }
 
@@ -112,12 +99,9 @@ export class KnowledgeTreeProvider implements vscode.TreeDataProvider<KnowledgeN
     if (!node) {
       const roots = this.roots;
       if (roots.length === 0) {
-        return [
-          new MessageNode(
-            'No documented workspace. Open a repository that has docs/help/registry.json.',
-            'info'
-          ),
-        ];
+        // An empty tree on purpose: what this state shows is the view's own welcome content, which offers the
+        // three things a folder without a registry can actually do.
+        return [];
       }
       const gaps = totals(roots).issues;
       const entry =

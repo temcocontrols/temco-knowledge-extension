@@ -143,7 +143,7 @@ export async function fileExists(uri: vscode.Uri): Promise<boolean> {
   }
 }
 
-/** Page id (`t3000/api-reference/data-points`) to the Markdown file that must exist for it. */
+  /** Page id (`area/chapter/page`) to the Markdown file that must exist for it. */
 export function pageUri(rootUri: vscode.Uri, id: string): vscode.Uri {
   const segments = id.split('/');
   const file = segments.pop() ?? id;
@@ -381,6 +381,38 @@ function append(map: Map<string, string[]>, key: string, value: string): void {
  */
 export function countStale(pages: readonly PageEntry[]): number {
   return pages.filter((page) => page.provenance?.stale === true).length;
+}
+
+/** The age past which a page's last change is worth mentioning, in the words the site's own pages use. */
+export const STALE_DAYS = 180;
+
+/** How old a date is, in whole days. An absent or unreadable date is `undefined`, never zero. */
+export function ageInDays(date: string | null | undefined): number | undefined {
+  if (!date) {
+    return undefined;
+  }
+  const at = Date.parse(date);
+  return Number.isNaN(at) ? undefined : Math.round((Date.now() - at) / 86_400_000);
+}
+
+/** How long ago, in the words the design's mock uses. `undefined` is a fact, not a failure. */
+export function ageText(days: number | undefined): string {
+  if (days === undefined) {
+    return 'unknown';
+  }
+  if (days < 1) {
+    return 'today';
+  }
+  if (days < 14) {
+    return `${days} day${days === 1 ? '' : 's'}`;
+  }
+  if (days < 60) {
+    return `${Math.round(days / 7)} weeks`;
+  }
+  if (days < 730) {
+    return `${Math.round(days / 30)} months`;
+  }
+  return `${Math.round(days / 365)} years`;
 }
 
 /** `docs/help/index.json` as the generator writes it — only the parts read here. */
