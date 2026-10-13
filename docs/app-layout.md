@@ -28,7 +28,7 @@ two of the five areas are ours.
 |---|---|---|
 | **▣ Content** | the docs tree: areas → chapters → pages, counts on the right, **Gaps** at the bottom | ours — the only view that does not exist in ordinary VS Code |
 | **Editor** | the page: plain Markdown, no front matter, Preview beside it | the shell's |
-| **Temco Knowledge** | the AI: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | ours — phase 2 |
+| **Temco Knowledge** | the AI: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | ours |
 | **Problems** | structural faults only, each naming the file to fix | ours |
 | **Status bar** | `pages · issues · never reviewed` | mixed |
 
@@ -38,8 +38,8 @@ Three properties of this layout are decisions, not accidents:
    terminals, Markdown preview and the problem list are the shell's, already there, nothing to build.
 2. **The AI is a panel beside the page, not a separate application.** It reads the page you have open and the
    registry; `Draft update` writes a normal edit you review — so accepting is a diff, rejecting is `Ctrl+Z`.
-3. **The Content view is phase 1 and already exists.** The AI panel is phase 2; the mock shows where it sits
-   so the layout does not move later.
+3. **Both of our areas exist now.** The Content view is phase 1; the AI panel is phase 2, and the mock above
+   is the panel as built — same place, same buttons, so the layout never had to move.
 
 ## The dashboard (phase 4)
 

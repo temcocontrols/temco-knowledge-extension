@@ -38,14 +38,16 @@ async function showAiStatus(context: vscode.ExtensionContext): Promise<void> {
     : 'nothing installed yet — no model, so no server';
 
   const items = status.running
-    ? ['Stop the server', 'Show the log', 'Models and Runtime']
-    : ['Models and Runtime', 'Show the log'];
+    ? ['Open the panel', 'Stop the server', 'Show the log', 'Models and Runtime']
+    : ['Open the panel', 'Models and Runtime', 'Show the log'];
   const answer = await vscode.window.showInformationMessage(
     `Temco Knowledge: local AI — ${summary}`,
     ...items
   );
 
-  if (answer === 'Stop the server') {
+  if (answer === 'Open the panel') {
+    await vscode.commands.executeCommand('temcoKnowledge.ai.focus');
+  } else if (answer === 'Stop the server') {
     stopAiServer();
   } else if (answer === 'Show the log') {
     showAiLog();

@@ -1,0 +1,130 @@
+/* The Temco Knowledge panel. No framework, no bundler: messages in, messages out. */
+:root {
+  --gap: 8px;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  margin: 0;
+  padding: var(--gap);
+  height: 100vh;
+  box-sizing: border-box;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--gap);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  padding-bottom: 6px;
+}
+
+#where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+}
+
+#transcript {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.turn {
+  border-left: 2px solid var(--vscode-panel-border);
+  padding: 2px 0 2px 8px;
+}
+
+.turn.user {
+  border-left-color: var(--vscode-focusBorder);
+}
+
+.turn.assistant {
+  border-left-color: var(--vscode-charts-blue, var(--vscode-focusBorder));
+}
+
+.turn.note,
+.turn.error {
+  border-left-style: dotted;
+  color: var(--vscode-descriptionForeground);
+}
+
+.turn.error {
+  color: var(--vscode-errorForeground);
+}
+
+.body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.body:empty::after {
+  content: "\2026";
+  color: var(--vscode-descriptionForeground);
+}
+
+#form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+textarea {
+  resize: vertical;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  padding: 4px 6px;
+}
+
+#buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  border: 1px solid var(--vscode-panel-border);
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+button.primary {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border-color: var(--vscode-button-background);
+}
+
+button.quiet {
+  border-color: transparent;
+  background: transparent;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hidden {
+  display: none;
+}

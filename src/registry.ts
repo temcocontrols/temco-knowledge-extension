@@ -153,6 +153,18 @@ export function collectPages(root: DocsRoot): PageEntry[] {
   return root.areas.flatMap((area) => area.chapters.flatMap((chapter) => chapter.pages));
 }
 
+/** The registered page a document belongs to, when it is one of them. */
+export function pageForUri(roots: readonly DocsRoot[], uri: vscode.Uri): PageEntry | undefined {
+  const wanted = uri.toString();
+  for (const root of roots) {
+    const page = collectPages(root).find((entry) => entry.uri.toString() === wanted);
+    if (page) {
+      return page;
+    }
+  }
+  return undefined;
+}
+
 export function totals(roots: readonly DocsRoot[]): Counts {
   return roots.reduce<Counts>(
     (sum, root) => ({

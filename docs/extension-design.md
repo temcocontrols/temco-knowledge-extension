@@ -11,6 +11,8 @@
 | `src/ai/catalog.ts` | what can be downloaded: the pinned llama.cpp build with the checksums GitHub publishes, the models on offer, their licences. No network, no filesystem |
 | `src/ai/install.ts` | the model folder, the resumable download and its checksum check, the unpack, and the manifest of what is installed |
 | `src/ai/runtime.ts` | the local server process: started on demand on a loopback port, health-checked, stopped when idle — and the single `complete()` call everything else uses |
+| `src/ai/prompts.ts` | the prompts, versioned with the code: the house rules, the question, the draft, the area. The only text that may reach the model |
+| `src/ai/panel.ts` | the `Temco Knowledge` panel: chat about the open page, `Draft update` as a diff, `Ask the area`, and the model line. Decides nothing itself |
 | `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder, and the AI's status |
 
 `registry.ts` is deliberately free of presentation: it is the part that would survive replacing the view, and
@@ -39,6 +41,26 @@ Content                        (view container: Temco Knowledge)
 - Clicking a page opens the file; if the file does not exist, the click offers to create it.
 - Areas and chapters are never empty: an area declared in `areas{}` with no pages still appears, which is
   itself information.
+
+## The AI panel
+
+```
+Temco Knowledge                                     (panel: the AI, bottom area)
+├─ header        the page's title (· stale) and the model in use · offline
+├─ transcript    your question, the answer as it streams, notes, errors
+├─ Draft update  → opens a diff: the page on the left, the draft on the right
+│                  Apply replaces the whole page — one Ctrl+Z takes it back
+├─ Ask the area  → the question, with the id, title and headings of the pages around it
+└─ Ask           → a question about the page on screen
+```
+
+- **It writes nothing by itself.** A draft lands in a diff and in the panel; putting it into the page is a
+  button, and the change is an ordinary undoable edit.
+- **What reaches the model is fixed.** The page's text and metadata, and for an area question the ids, titles
+  and headings of its neighbours. No other file, no repository sweep, no credential.
+- **Every draft names its prompt version**, so a draft can be traced to the instructions that produced it.
+- **With nothing installed the panel still opens** and says what to download, so the extension never looks
+  broken — the AI is optional the whole way down.
 
 ## Commands
 

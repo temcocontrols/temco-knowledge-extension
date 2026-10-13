@@ -14,7 +14,8 @@
   ],
   "main": "./out/extension.js",
   "activationEvents": [
-    "onView:temcoKnowledge.pages"
+    "onView:temcoKnowledge.pages",
+    "onView:temcoKnowledge.ai"
   ],
   "contributes": {
     "viewsContainers": {
@@ -31,6 +32,13 @@
         {
           "id": "temcoKnowledge.pages",
           "name": "Content"
+        }
+      ],
+      "panel": [
+        {
+          "type": "webview",
+          "id": "temcoKnowledge.ai",
+          "name": "Temco Knowledge"
         }
       ]
     },

@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import { registerAiCommands } from './ai/commands';
+import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
 import { publishDiagnostics } from './diagnostics';
 import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
@@ -35,6 +36,15 @@ export function activate(context: vscode.ExtensionContext): void {
 
   let roots: DocsRoot[] = [];
 
+  // The AI panel reads the page and the registry through the same model the tree does; it decides nothing.
+  const panel = new AiPanel(context, () => roots);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(AI_VIEW_ID, panel, {
+      webviewOptions: { retainContextWhenHidden: true },
+    }),
+    vscode.window.onDidChangeActiveTextEditor(() => panel.refresh())
+  );
+
   const refresh = async (): Promise<void> => {
     const broken: BrokenRegistry[] = [];
     roots = [];
@@ -61,6 +71,7 @@ export function activate(context: vscode.ExtensionContext): void {
       ]);
     }
     updateStatus(status, roots, broken);
+    panel.refresh();
   };
 
   const report = async (): Promise<void> => {

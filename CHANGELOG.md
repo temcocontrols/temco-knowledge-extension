@@ -23,6 +23,11 @@
   a loopback port (`--host 127.0.0.1`, never the LAN), waited for with a `/health` check, and stopped when idle
   (`temcoKnowledge.ai.idleMinutes`), when its model is removed, or when the window closes. *AI Status* names the
   runtime and model in use and can stop the server or open its log.
+- **The AI panel.** A *Temco Knowledge* panel: ask about the open page, `Draft update` (the draft opens as a
+  diff; *Apply* replaces the page and one Ctrl+Z takes it back), and `Ask the area` (the pages around the one
+  on screen, by id, title and headings). Answers stream as they arrive, every draft names its prompt version,
+  and with nothing installed the panel still opens and says what to download. What reaches the model is the
+  page and its metadata — never another file.
 
 ## 0.0.1
 
