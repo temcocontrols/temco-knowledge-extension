@@ -113,6 +113,21 @@ names.
   and when the window closes. The extension holds no model in its own process, so nothing to load or unload
   blockingly.
 
+## Guardrails, in code
+
+`12-ai-features.md` §5 lists them; this is where each one actually lives, so it can be checked rather than
+trusted.
+
+| Guardrail | Where it is enforced |
+|---|---|
+| No shipped page is edited by a model | A draft opens in a diff; the page changes only when **Apply draft** is pressed, and then as one undoable `WorkspaceEdit` |
+| No secrets, no customer data | The only thing a prompt can take is a `PageContext` — page text, path, registry metadata — plus ids, titles and headings for an area question. No parameter exists that could carry another file, a token or a sweep of the repository |
+| Traceable | `PROMPT_VERSION` is printed on every draft and in the panel's model line, and a draft also names its commit range (`src/ai/history.ts`) |
+| Degradable | The panel opens with nothing installed and says what to download; the server never starts without a runtime and a model; a missing prompt file is a named error, not a stack trace; a page too large for one draft is refused rather than half-drafted |
+| Deterministic first | Staleness is read from `index.json`, never recomputed; the low-confidence fallback is plain term overlap; citations are resolved against the registry |
+| Cost bounded | 6 turns of history, 40 area candidates, 40 commits, 100k characters of page text, 1024 tokens per answer and 2048 per draft, `--ctx-size 8192` |
+| Offline | The runtime is a local process on `127.0.0.1`; the only other network calls are the downloads the user starts |
+
 ## Roadmap
 
 | Phase | Adds | Notes |

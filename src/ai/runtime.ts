@@ -19,6 +19,8 @@ const OUTPUT_NAME = 'Temco Knowledge: AI';
 /** A cold 7B model on a slow disk takes a while; giving up early would be the wrong answer. */
 const HEALTH_TIMEOUT_MS = 120_000;
 const HEALTH_POLL_MS = 500;
+/** How long an answer may be when the caller does not say. An answer is a few sentences. */
+const DEFAULT_MAX_TOKENS = 1024;
 
 export interface AiServerInfo {
   baseUrl: string;
@@ -102,10 +104,20 @@ export function showAiLog(): void {
 export async function complete(
   context: vscode.ExtensionContext,
   messages: readonly ChatMessage[],
-  options: { onToken?: (text: string) => void; token?: vscode.CancellationToken } = {}
+  options: {
+    onToken?: (text: string) => void;
+    token?: vscode.CancellationToken;
+    /** A ceiling on the answer, so one request cannot run to the model's own limits. */
+    maxTokens?: number;
+  } = {}
 ): Promise<string> {
   const server = await startAiServer(context);
-  const payload = JSON.stringify({ messages, temperature: 0.2, stream: options.onToken !== undefined });
+  const payload = JSON.stringify({
+    messages,
+    temperature: 0.2,
+    stream: options.onToken !== undefined,
+    max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+  });
   const response = await post(server.port, '/v1/chat/completions', payload, options.onToken, options.token);
   touchIdle(context);
   return response;

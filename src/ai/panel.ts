@@ -25,6 +25,11 @@ export const AI_VIEW_ID = 'temcoKnowledge.ai';
 const HISTORY_TURNS = 6;
 /** The most candidate pages one area question may carry. Headings only, so the prompt stays bounded. */
 const AREA_CANDIDATES = 40;
+/** The most page text one request may carry. Past this a draft would be a truncated page, which is worse than none. */
+const MAX_BODY = 100_000;
+/** An answer is a few sentences; a draft is a whole page. Both are bounded so a request cannot run away. */
+const ANSWER_TOKENS = 1024;
+const DRAFT_TOKENS = 2048;
 
 const DEFAULT_DRAFT_NOTE =
   'No description of the change was given. Review the page against its own headings and propose the update ' +
@@ -72,6 +77,7 @@ export class AiPanel implements vscode.WebviewViewProvider {
         : undefined,
       model: status.model ? entryById(status.model.id)?.label ?? status.model.id : undefined,
       runtimeReady: status.runtime !== undefined,
+      version: PROMPT_VERSION,
       busy: this.busy,
       canApply: this.draft !== undefined,
     });
@@ -146,6 +152,16 @@ export class AiPanel implements vscode.WebviewViewProvider {
     }
 
     const page = await this.pageContext(entry);
+    // A draft is a whole page. If the page did not fit, applying a draft would delete whatever was cut.
+    if (kind === 'draft' && page?.truncated) {
+      this.post({
+        type: 'note',
+        text:
+          `This page is longer than one draft can carry (over ${MAX_BODY.toLocaleString('en-US')} characters). ` +
+          'Nothing was changed — split the page, or edit it by hand.',
+      });
+      return;
+    }
     // A draft is *about a change*, so the change is read before anything is asked.
     const range = kind === 'draft' && entry ? await this.changeRange(entry) : undefined;
     this.busy = true;
@@ -165,6 +181,7 @@ export class AiPanel implements vscode.WebviewViewProvider {
           this.post({ type: 'chunk', text: piece });
         },
         token: tokenSource.token,
+        maxTokens: kind === 'draft' ? DRAFT_TOKENS : ANSWER_TOKENS,
       });
       const text = (answer || streamed).trim();
       if (text.length === 0) {
@@ -426,7 +443,8 @@ export class AiPanel implements vscode.WebviewViewProvider {
       updated: entry.provenance?.updated ?? null,
       stale: entry.provenance?.stale === true,
       headings: entry.provenance?.headings ?? [],
-      body,
+      truncated: body.length > MAX_BODY,
+      body: body.length > MAX_BODY ? body.slice(0, MAX_BODY) : body,
     };
   }
 

@@ -71,7 +71,7 @@
       : 'no page open';
     where.title = next.page ? next.page.id : 'Open a page from the Content view';
     model.textContent = next.model
-      ? next.model + ' · offline'
+      ? next.model + ' · offline' + (next.version ? ' · ' + next.version : '')
       : next.runtimeReady
         ? 'no model chosen'
         : 'nothing installed';

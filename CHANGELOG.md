@@ -37,6 +37,10 @@
   dashed when the page is stale — and a name that is not a page is reported as a suspicion. An *Ask the area*
   answer that named no page at all is replaced by search results over titles, headings, keywords and tags,
   rather than a synthesis nothing supports.
+- **Guardrails made explicit.** Answers are bounded (1024 tokens; drafts 2048), a page too large for one draft
+  is refused instead of half-drafted, a missing prompt file is a named error, and the panel's model line carries
+  the prompt version. `extension-design.md` now maps every guardrail from `12-ai-features.md` §5 to the place
+  that enforces it.
 
 ## 0.0.1
 

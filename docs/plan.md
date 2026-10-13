@@ -43,7 +43,10 @@ Three rules this plan keeps, taken from the design rather than invented here:
 - **Nothing is committed yet.** HEAD is still `initial project skeleton`; everything above sits in the
   working tree. This is a `git` step for the owner, not a code step.
 
-## Phase 2 — the AI · in progress
+## Phase 2 — the AI · done
+
+Every guardrail is now enforced somewhere specific rather than asked for in prose — the table is in
+`extension-design.md` under *Guardrails, in code*.
 
 The phase the repository exists for. The model runs **locally** — no cloud, no keys, no documentation text
 leaving the building — it is **draft-only**, and it is a setting rather than a hard-coded choice, so a
@@ -57,7 +60,7 @@ different model later changes nothing else.
 | 2.4 | **The panel** — the `Temco Knowledge` view: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | the panel reads the open document and `registry.ts`, and holds no logic of its own | **done** 2026-10-13 |
 | 2.5 | **`Draft update`** — commit range from git (commits touching the page's `code[]` globs, since its last review), prompts as versioned files, the answer applied as a workspace edit | accepting is a diff, rejecting is `Ctrl+Z`, and the draft names its commit range and prompt version | **done** 2026-10-13 |
 | 2.6 | **`Ask the area`** — candidates from the area and tags, an answer that cites pages; low confidence returns search results instead of a synthesis; `stale` pages excluded or explicitly warned | every answer cites a page that exists, and a stale page is never cited silently | **done** 2026-10-13 |
-| 2.7 | **Guardrails as code** — degradable, traceable, no secrets or customer data in prompts (commit metadata, paths and page text only), cost bounded | with the model deleted, every phase-1 feature and every command still works | next |
+| 2.7 | **Guardrails as code** — degradable, traceable, no secrets or customer data in prompts (commit metadata, paths and page text only), cost bounded | with the model deleted, every phase-1 feature and every command still works | **done** 2026-10-13 |
 
 **An answer's citations are checked, not believed.** `src/ai/citations.ts` splits what an answer names into
 pages that exist and ids that do not: a known id becomes a chip that opens it (dashed and marked when the page
@@ -99,7 +102,7 @@ file host: **pin the model checksums and sizes** (they ship as `sha256: ''`, whi
 chooses to download, so the rule about asking before adding a dependency is met by asking for the download
 instead — and the extension still installs into an ordinary editor on any OS.
 
-## Phase 3 — publishing
+## Phase 3 — publishing · next
 
 | # | Step | Done when |
 |---|---|---|

@@ -14,14 +14,21 @@ export const PROMPT_VERSION = 'ai-v2';
 const TEMPLATE_FOLDER = 'prompts';
 const loaded = new Map<string, string>();
 
-/** The prompt text, read once. A missing file is a packaging bug and says so. */
+/** The prompt text, read once. A missing file is a packaging bug, and says so in those words. */
 function template(context: vscode.ExtensionContext, name: string): string {
   const cached = loaded.get(name);
   if (cached !== undefined) {
     return cached;
   }
   const file = vscode.Uri.joinPath(context.extensionUri, TEMPLATE_FOLDER, `${name}.md`).fsPath;
-  const text = fs.readFileSync(file, 'utf8');
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    throw new Error(
+      `The instructions at prompts/${name}.md are missing from the extension. Reinstall it (or the .vsix) and try again.`
+    );
+  }
   loaded.set(name, text);
   return text;
 }
@@ -44,6 +51,8 @@ export interface PageContext {
   updated: string | null;
   stale: boolean;
   headings: string[];
+  /** Set when the page was too large to send whole, so nothing may be drafted from it. */
+  truncated: boolean;
   body: string;
 }
 
