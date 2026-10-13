@@ -12,7 +12,8 @@ because that is where the content has to be.
 | [`architecture.md`](architecture.md) | you need the whole picture: the four folders, the flow, how it ships |
 | [`registry-schema.md`](registry-schema.md) | you touch anything that reads or writes registry data |
 | [`extension-design.md`](extension-design.md) | you add a view, a command, a check or a diagnostic |
-| [`app-layout.md`](app-layout.md) | you need the target UI: the application window and the dashboard |
+| [`platform-design.md`](platform-design.md) | you work on the platform itself: sources, the documents a person creates, builds and artifacts, the AI over history, and the catalog |
+| [`app-layout.md`](app-layout.md) | you need the target UI: the application window, the site's generated dashboard, and the seam between them |
 | [`plan.md`](plan.md) | you are about to implement something: the numbered steps, their order, their acceptance tests |
 | [`design/help-platform/`](design/help-platform/README.md) | you need the platform design itself: content model, registry, search, the offline CHM, editing, feedback, AI, governance |
 
@@ -29,7 +30,7 @@ them apart is what stops "put it in Temco Knowledge" from being ambiguous.
 
 ## Where the platform design lives
 
-[`design/help-platform/`](design/help-platform/README.md) — 16 documents covering the content model, the
+[`design/help-platform/`](design/help-platform/README.md) — 17 documents covering the content model, the
 registry, search, the offline CHM, the editing and git flow, feedback, the AI features, the implementation
 plan and the governance rules. `16-management-overview.md` is the one-page version.
 

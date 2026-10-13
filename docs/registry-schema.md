@@ -98,3 +98,26 @@ Run on every refresh, cheap enough to run on 335 pages without thinking about it
 **Deliberately not checked here:** prose quality, links, images and staleness. Those belong to the product
 repo's own gates (`npm run docs:verify`, the media audit, `docs-owed`) and to the AI phase, where a commit
 range can be read. Duplicating them in the extension would create two answers to one question.
+
+## The feedback file — a proposal, not a contract
+
+`09-feedback-subscriptions-notifications.md` was written against an endpoint on the T3000 server plus database
+tables, and `16-management-overview.md` supersedes that hosting model, so where a feedback row comes from was
+never settled. This extension reads the smallest shape that carries what routing needs, per repository:
+
+```json
+{
+  "version": 1,
+  "rows": [
+    { "page": "t3000/api-reference/data-points", "kind": "wrong", "note": "…", "at": "2026-09-01", "state": "open", "by": "…" }
+  ]
+}
+```
+
+`page` is a page id, `at` is an ISO date, and `state` is `open` or anything else for handled. A row whose page
+is not in the registry is still reported — with its id, as plain text rather than a link — because that is a
+finding about the row, not a reason to drop it. With no such file, **Feedback by Owner** says the source is not
+agreed rather than reporting no feedback.
+
+**This shape is the extension's proposal**, and the docs owner accepts or replaces it. It is the only part of
+phase 5 that is not settled.

@@ -16,7 +16,7 @@ keeps this repo's own name, `temco-knowledge-extension`, because that is its ide
 
 **The content lives elsewhere.** Documentation pages and `docs/help/registry.json` live in each product
 repository (today: `T3000Webview-EEZ-Studio`). **The platform design is here**, in `docs/design/help-platform/`
-— 16 documents, of which these matter most:
+— 17 documents, of which these matter most:
 
 | Document | Why it matters to this repo |
 |---|---|
@@ -24,6 +24,11 @@ repository (today: `T3000Webview-EEZ-Studio`). **The platform design is here**, 
 | `12-ai-features.md` | what the AI is allowed to do |
 | `15-online-editor.md` | the editor surfaces |
 | `16-management-overview.md` | the whole picture, for management |
+
+The platform's **own** design — sources of many kinds, the documents a person creates and versions, the builds
+and artifacts, the AI over the history, and the SQLite catalog that remembers it all — is
+[`docs/platform-design.md`](docs/platform-design.md), and its build order (R1–R6) is where the next work is
+planned.
 
 The paths those documents name (`docs/t3000/**`, `docs/help/*.json`, `docs/docfx.json`, `scripts/docs-*.mjs`)
 belong to the **product** repository, which keeps the content and the publishing pipeline.
@@ -33,8 +38,11 @@ belong to the **product** repository, which keeps the content and the publishing
 1. **No product content, no secrets.** Never add a product's page, image, registry or any credential to this
    repo. The only documentation that lives here is this repository's own plus the platform design in
    `docs/design/help-platform/`. The extension operates on whatever folder is open.
-2. **Read-only by default.** The only write allowed without an explicit user command is creating the empty
-   file for a page that the registry already declares. Never edit `registry.json`, and never commit on the
+2. **Read-only by default, and two writes on request.** Reading is what the extension does; it creates a file in
+   exactly two cases, and each one is its own command with a confirmation naming the path: the empty file for a
+   page the registry already declares, and an empty `docs/help/registry.json` in a folder you have open that has
+   none. Nothing under `_admin/` or `_edit/` is ever written — `00-architecture.md` calls those *generated pages,
+   not documentation* — an existing `registry.json` is **never edited**, and nothing is ever committed on the
    user's behalf.
 3. **Never publish.** This extension invokes the product repo's own build scripts — `docs:site`, and the
    non-deploying `build:help:dry` — and reports the artifacts they leave behind. It never runs the form that
@@ -57,8 +65,11 @@ src/tree.ts          the Content view (areas, chapters, pages, Gaps, issue child
 src/diagnostics.ts   turns issues into Problems, in the file that has to be fixed
 src/extension.ts     activation: view, status bar, commands, file watcher
 src/builds.ts        invokes the product repo's own build scripts (never the deploying one)
-src/dashboard.ts     reads the organisation from the GitHub API, cached, on command only (token in secrets)
-src/dashboardView.ts the Organisation view: local rows and API rows, both in the same words
+src/report.ts        the staleness report, grouped by owner (Markdown, untitled, no writes)
+src/scaffold.ts      starts a registry in an open folder that has none (smallest valid file, confirmed)
+src/feedback.ts      feedback rows routed to their owner, against a proposed file shape
+src/catalog/         schema.ts (the tables) · store.ts (node:sqlite, in the extension's own storage,
+                     never in a repository) · commands.ts (the catalog status)
 src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack),
                      runtime.ts (the local server process), prompts.ts (the versioned instructions),
                      history.ts (the commit range), citations.ts (what an answer pointed at),
@@ -69,8 +80,9 @@ prompts/             the instruction text the AI receives (system.md, ask.md, dr
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
 
-Contributed surface lives in `package.json`: one view container (`temcoKnowledge`) holding the Content and
-Organisation views, one webview panel (`temcoKnowledge.ai`), and the commands — all named `temcoKnowledge.*`.
+Contributed surface lives in `package.json`: two view containers — `temcoKnowledge` in the activity bar, holding
+the Content view, and `temcoKnowledgePanel` in the panel (docked on the right by the workbench), holding the AI webview view
+(`temcoKnowledge.ai`) — and the commands, all named `temcoKnowledge.*`.
 
 ## Conventions
 
@@ -82,6 +94,9 @@ Organisation views, one webview panel (`temcoKnowledge.ai`), and the commands �
   a count — never recomputed here, never a problem.
 - **Comments explain why, not what.** Keep them short and truthful; if a comment and the code disagree, the
   comment is wrong.
+- **The catalog is the platform's memory.** Sources, documents, builds, artifacts, commits and events live in
+  the extension's own storage (`context.globalStorageUri`) — never in a repository, never in a product's git
+  history, never committed. Reading a source records it; it never writes to one.
 - **English only** in code, comments and user-visible strings.
 
 ## Commands
@@ -99,7 +114,8 @@ folder — this repo alone has no registry, so the Content view will correctly s
 ## What is planned, in order
 
 [`docs/plan.md`](docs/plan.md) is the step-level list and the only place progress is marked: phase 1 the
-Content view (done), 2 the local AI, 3 publishing, 4 the portfolio dashboard, 5 feedback and health. Point a
+Content view (done), 2 the local AI, 3 publishing, 4 **withdrawn** (the dashboard is the product repository's
+generated page, not ours), 5 feedback and health. Point a
 session at a step — "implement phase 2, step 3" — and it finds the acceptance test and the blockers.
 
 Details for each phase are in `docs/`.

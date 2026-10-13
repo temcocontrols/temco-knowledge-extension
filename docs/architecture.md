@@ -19,8 +19,9 @@ C:\QN\temcocontrols\
 │   ├─ src/tree.ts                the Content view: areas, chapters, pages, gaps
 │   ├─ src/diagnostics.ts         problems, in the file that has to be fixed
 │   ├─ src/extension.ts           view, status bar, commands, file watcher
+│   ├─ src/…                      builds, report, scaffold, feedback, ai/ — the module table is in extension-design.md
 │   ├─ media/knowledge.svg        the view icon
-│   └─ docs/design/help-platform/ the platform design (16 documents), moved here 2026-10-12
+│   └─ docs/design/help-platform/ the platform design (17 documents), moved here 2026-10-12
 │
 ├─ temco-knowledge-studio         the application — the fork of VS Code
 │   ├─ product.json               branding: name, icon, protocol, gallery
@@ -94,7 +95,11 @@ C:\QN\temcocontrols\
 ## The three boundaries that must not blur
 
 1. **Content never moves.** Pages stay at `docs/t3000/**` in the product repo, which is why the application,
-   the MCP tools and the F1 help keep working untouched. This extension only reads them. One deliberate
+   the MCP tools and the F1 help keep working untouched. This extension reads them, and writes to one only when
+   a maintainer asks and confirms the exact path: the file for a page the registry declares, a draft they
+   applied, or an empty registry where a folder they have open has none. Nothing under `_admin/` or `_edit/` is
+   ever written — those are generated pages — and nothing else in the folder is touched. Nothing is ever
+   committed. One deliberate
    exception, made on 2026-10-12: the platform **design** moved from the product repo's `docs/design/` to
    `docs/design/help-platform/` here, because the design of a thing belongs with the thing. The product repo
    keeps the content and the pipeline; it no longer registers or publishes the design pages.

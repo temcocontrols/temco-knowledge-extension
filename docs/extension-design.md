@@ -17,8 +17,9 @@
 | `src/ai/panel.ts` | the `Temco Knowledge` panel: chat about the open page, `Draft update` as a diff, `Ask the area`, and the model line. Decides nothing itself |
 | `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder, and the AI's status |
 | `src/builds.ts` | the product repo's own builds, invoked as VS Code tasks and judged by the artifact they leave — never by an exit code, and never the form that deploys |
-| `src/dashboard.ts` | the organisation read from the GitHub API: the repository list, each registry, the last commit touching `docs/`, cached for an hour |
-| `src/dashboardView.ts` | the Organisation view: an open-folder row and an API row, both in the same words, and the reasons under the ones that need attention |
+| `src/report.ts` | the staleness report: what needs attention, grouped by owner, as Markdown. Counts rather than lists for the pages that have merely never been reviewed |
+| `src/scaffold.ts` | starting a registry in an open folder that has none: the smallest valid file, on a confirmation, with the seeding left to the repository's own generator |
+| `src/feedback.ts` | feedback rows routed to their page's owner, against a proposed file shape, with the aging called out |
 
 `registry.ts` is deliberately free of presentation: it is the part that would survive replacing the view, and
 the part an AI feature will reuse to know what pages exist.
@@ -50,7 +51,7 @@ Content                        (view container: Temco Knowledge)
 ## The AI panel
 
 ```
-Temco Knowledge                                     (panel: the AI, bottom area)
+Temco Knowledge                                     (panel: the AI, docked on the right)
 ├─ header        the page's title (· stale) and the model in use · offline
 ├─ transcript    your question, the answer as it streams, notes, errors
 ├─ Draft update  → opens a diff: the page on the left, the draft on the right
@@ -70,28 +71,19 @@ Temco Knowledge                                     (panel: the AI, bottom area)
 - **With nothing installed the panel still opens** and says what to download, so the extension never looks
   broken — the AI is optional the whole way down.
 
-## The organisation view
+## The dashboard, and why this repository does not have one
 
-```
-Temco Knowledge Studio — ORGANISATION
-├─ Open folders                  (measured here: no network, and the checks see the files)
-│  └─ T3000Webview-EEZ-Studio   318 pages · 2 days · current
-├─ temcocontrols                 62 repositories      (read from GitHub, cached an hour)
-│  ├─ T3000_Building_Automation_System  298 pages · 3 weeks · 12 gaps
-│  │  └─ 12 gaps — open the repository to see them on the pages
-│  └─ …
-└─ Run “Documentation Dashboard” to read the organisation       (until it has been run)
-```
+`00-architecture.md` puts the dashboard on the **site**, not in the editor: a **generated static page** at
+`/docs/_admin/` — coverage · stale by owner · docs-owed · unowned · unreviewed · broken links · feedback ·
+health score — noindex, out of the PDF, the CHM and the offline zip, built by the product repository's own
+pipeline (`13-implementation-plan.md` step 1.19). Its rows deep-link **into** the editor, and that hand-off is
+this extension's half of it.
 
-- **Two sources, never mixed**, and every row says which it is: the folders you have open (exact — the same
-  checks the Content view runs, including whether a registered page's file exists) and the organisation read
-  over the API (a floor, because a remote reader cannot see files). Offline, the first still renders in full and
-  the header says when GitHub was last read.
-- **A tree, not a table.** VS Code has no table view and `app-layout.md` mocks one; rather than add a webview for
-  columns, the columns became the row's description and tooltip. Recorded here because it is a deliberate
-  divergence from the mock, not an oversight.
-- **Problems first.** A repository that needs attention is collapsible, and its children are the reasons to act
-  on — the same shape the Content view uses for a page.
+An earlier phase built an organisation read here instead — a repository list over the GitHub API and a sidebar
+view — which answered the dashboard's own question more weakly (repository-level facts, none of the page-level
+health) and in a second place. Both are deleted, along with the token setting they needed. The rule is the same
+one this document already carries for checks: **the extension never computes an answer the product repository
+already owns.**
 
 ## Commands
 
@@ -109,10 +101,15 @@ Temco Knowledge Studio — ORGANISATION
 | `temcoKnowledge.aiStatus` | which runtime and model are in use, whether the server is running, and how to stop it or read its log |
 | `temcoKnowledge.buildSite` | invokes the repository's own `docs:site` as a task and reports the files it produced |
 | `temcoKnowledge.buildHelp` | invokes the non-deploying help build (`build:help:dry`) and reports the CHM it produced |
-| `temcoKnowledge.dashboard` | reads the organisation from GitHub (cached an hour) and writes the table to the output channel |
-| `temcoKnowledge.dashboardRefresh` | the same, past the cache |
-| `temcoKnowledge.setGithubToken` | stores a token in secret storage, or clears the one stored |
-| `temcoKnowledge.openRepository` | opens a row: the folder for a locally measured row, GitHub for one read over the API |
+| `temcoKnowledge.stalenessReport` | opens the report of what is owed as an untitled Markdown document — nothing is written |
+| `temcoKnowledge.startRegistry` | creates the smallest valid `docs/help/registry.json` in an open folder that has none, after a confirmation — and is also the Content view's empty state |
+| `temcoKnowledge.feedback` | reads each repository's `docs/help/feedback.json`, routes the rows to their owners, and calls out the aging |
+
+Where they surface: the Content view's title carries *Validate*, *Open Registry*, *Refresh*, *Models and
+Runtime*, *Documentation Owed* and *Feedback by Owner*. Everything else is in the palette, where it costs no
+room — and `startRegistry` is a row in the view's empty state, so the view and the button that fixes it are
+never apart. There is no organisation-wide surface here by design: that question belongs to the site's
+generated dashboard, which this extension hands off to rather than re-implements.
 
 ## What refreshes the view
 
@@ -126,23 +123,32 @@ Everything else, including saving a page, does not refresh: the tree describes s
 
 ## Rules the code follows
 
-- **One writer, on request, and never inside a repository.** The only write the extension makes to the folder
-you opened is creating the empty file for a page the registry already declares. What it downloads — the
-runtime, a model, the manifest that records them — goes to its own storage folder, or to the folder a setting
-names.
+- **Two writes, each asked for.** Reading is what the extension does; it writes in exactly two places, and only
+  on a command that names what it will create: the empty file for a page the registry already declares, and an
+  empty registry where a folder you have open has none. Both are files the registry's own generator already
+  expects, and neither is ever an existing file. **Nothing under `_admin/` or `_edit/` is written at all** — the
+  design's rule is that those are generated pages, not documentation. What it downloads — the runtime, a model,
+  the manifest that records them — goes to its own storage folder, or to the folder a setting names, and never
+  into a repository.
 - **A diagnostic lands where the fix is** — the page for a page problem, `registry.json` for a missing file
   or an unreadable registry.
 - **Counts are not problems.** `reviewed: null` and empty tag lists are normal in a 335-page registry; as
   warnings they would bury the faults that matter.
 - **No module knows about the fork.** Nothing references `temco-knowledge-studio`, by design.
 - **Nothing is fetched unasked.** The only network calls are the runtime and model downloads the user starts
-  from *Models and Runtime*, and the dashboard read the user starts from *Documentation Dashboard*: no telemetry,
-  no update check, no background refresh. A token lives in secret storage, never in a file or a setting.
+  from *Models and Runtime*: no telemetry, no update check, no background refresh, no organisation scan. No
+  credential is stored at all.
 - **Nothing native ships.** A compiled engine is per-OS; a downloaded one is not, which is what keeps one
   `.vsix` valid on every platform — our application, plain VS Code, Windows or macOS.
 - **Building is not shipping.** The build commands invoke the repository's own scripts and report what those
   scripts produced. The form that deploys into a T3000 installation is never run, and nothing is uploaded or
   committed.
+- **A generated page is never overwritten.** Which now means: nothing under `_admin/` or `_edit/` is written at
+  all. The dashboard is the product repository's generated page; this extension is the deep-link target it
+  hands off to.
+- **An empty state is actionable.** A view that only explains itself is a dead end, and the folder with no
+  registry is exactly where a new product repository starts. The Content view's empty state is a row that runs
+  *Start a Registry* rather than a sentence telling the reader to go and find one.
 - **A process, only while it is wanted.** The local server starts when something asks the AI for an answer,
   never at activation; it listens on loopback only; and it is stopped when idle, when its model is removed,
   and when the window closes. The extension holds no model in its own process, so nothing to load or unload
@@ -168,10 +174,10 @@ trusted.
 | Phase | Adds | Notes |
 |---|---|---|
 | 1 | **the Content view** — registry, checks, gaps, status bar | done |
-| 2 | **the AI** — model download, worker, draft page updates from a commit range, ask-the-area | a local model, offline; drafts only, a human accepts |
-| 3 | **publishing** — invoke the product repo's site build and offline help build, then hand over the artifacts | the extension orchestrates; it does not reimplement the pipeline |
-| 4 | **the dashboard** — every repository in the organisation: pages, owner, last change, gaps | GitHub API, no clones, token in secret storage |
-| 5 | **feedback and health** — intake, staleness routing, the `/_admin/` page | grows out of the same collector as the dashboard |
+| 2 | **the AI** — model download, worker, draft page updates from a commit range, ask-the-area | done — a local model, offline; drafts only, a human accepts |
+| 3 | **publishing** — invoke the product repo's site build and offline help build, then hand over the artifacts | done — the extension orchestrates; it does not reimplement the pipeline |
+| 4 | ~~the dashboard~~ — withdrawn: the dashboard is the product repository's generated page at `/docs/_admin/` | 4.1–4.4 removed 2026-10-13; *Start a Registry* survived as the Content view's empty state |
+| 5 | **feedback and health** — intake, and the report of what is owed | done — the report's cadence stays in the product repo's CI, and the feedback file's shape is a proposal for the docs owner |
 
 The step-level list — what each step touches, its acceptance test and what is blocked — is
 [`plan.md`](plan.md). This table is the summary; `plan.md` is what work is pointed at.

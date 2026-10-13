@@ -5,11 +5,27 @@ what a session is pointed at — *"implement phase 2, step 3"* — and it is the
 marked. If a step here and the design package disagree about what to build, the design package wins and the
 step is wrong.
 
-Where the design lives: [`design/help-platform/`](design/help-platform/README.md) — 16 documents, moved here
+Where the design lives: [`design/help-platform/`](design/help-platform/README.md) — 17 documents, moved here
 from the product repository on 2026-10-12. **The paths inside them are product-repo paths**
 (`docs/t3000/**`, `docs/help/registry.json`, `docs/docfx.json`, `scripts/docs-*.mjs`). The ones a step below
 leans on: `05-content-and-registry.md`, `12-ai-features.md`, `13-implementation-plan.md`,
 `15-online-editor.md`, `16-management-overview.md`.
+
+## The platform's own design
+
+This repository is not a per-repository reader: it is **the platform** — a standalone internal application over
+many product repositories (`16-management-overview.md`: *“The platform is a standalone internal application… it
+does not require T3000 to be installed”*, and *“build an extension, not a fork”*). The platform's own design is
+[`platform-design.md`](platform-design.md): **sources** of many kinds (a git remote at a chosen branch, a local
+folder, an archive), the **documents** a person creates and versions (`t3000_dev.chm`, `t3000_webview.pdf`), the
+**builds and artifacts** that come out, the AI that reads the history, and the **SQLite catalog** that remembers
+all of it. Its build order is **R1–R6** there, and that is where the next work is planned. This file still holds
+the per-feature steps, and the design package still wins wherever content, registry or publishing rules are
+concerned.
+
+Two consequences worth stating, because they were wrong before: a **repository is not the unit of work** — a
+document is, and a repository is only one kind of source — and a project is **not** defined by already carrying a
+registry, since the catalog discovers documentation wherever it is and *suggests* the next step.
 
 ## How to read a step
 
@@ -21,8 +37,9 @@ Three rules this plan keeps, taken from the design rather than invented here:
 
 - **Nothing here duplicates the product repository's work.** Link checks, media audits, prose gates and the
   staleness *verdict* belong there; two answers to one question is the bug we are avoiding.
-- **Only one write, and only on request.** Creating the empty file for a page the registry already declares.
-  No step may add a second writer without amending that rule first.
+- **Two writes, and only on request.** The empty file for a page the registry already declares, and an empty
+  registry where a folder you have open has none. No step may add a third writer without amending that rule
+  first — and nothing under `_admin/` or `_edit/` is ever written, because those are generated.
 - **The AI drafts; a named human approves.** No step gives the model publish rights, and what a glob or a
   generator can answer is never given to a model.
 
@@ -123,50 +140,59 @@ inherently writes into the product layout (`T3000_Building_Automation_System\Hel
 is a different repository again; the search for the artifact looks there by the folder's *name*, never by hard
 typing another repository's path.
 
-## Phase 4 — the dashboard · one step gated
+## Phase 4 — the dashboard · withdrawn 2026-10-13
+
+**This phase rested on a misreading, and it is removed.** `00-architecture.md` defines the dashboard as a
+**generated static page** at `/docs/_admin/` — coverage · stale by owner · docs-owed · unowned pages · broken
+links · feedback · help-id coverage — noindex, excluded from the PDF, the CHM and the offline zip, and built by
+the **product repository's** own pipeline (`13-implementation-plan.md` step 1.19 / 24). It is an authoring
+surface *on the site*, and its rows deep-link **into** the editor (`vscode://file/…`, `00-architecture.md`).
+
+What was built here instead — an organisation read over the GitHub API, and a sidebar view of it — answered the
+same question more weakly: repository-level facts from the API, with none of the page-level health the real
+dashboard carries, and a second organisation-wide answer to a question the design answers in exactly one place.
+That is the duplicate this plan's first rule exists to prevent, so the two modules, the view, its four commands
+and its two settings are deleted rather than kept and renamed.
+
+**4.5 survives, rehomed.** *Start a Registry* was never about the dashboard: it acts on a folder you have open,
+and it is the Content view's empty state — which is where a folder with no registry actually starts, since the
+view has nothing else to show. Everything else in this phase is product-repository work.
+
+**The seam, and why the extension is not the dashboard.** The dashboard asks *which pages need work across the
+organisation?* — a question about the site, answered on the site, by the site's own generator. The Content view
+asks *which pages need work in the repository I have open?* — the same vocabulary, one repository, with the
+reasons marked in the file that has to be fixed. The extension's half of that hand-off is the deep link: the
+dashboard's row opens the page here, and `app-layout.md` draws the two worlds and the seam between them.
+
+## Phase 5 — feedback and health · done, with one contract to confirm
 
 | # | Step | Done when | State |
 |---|---|---|---|
-| 4.1 | The collector: the organisation's repositories, each one's `docs/help/registry.json`, and the last commit touching `docs/` | ~3 calls per repository, cached for an hour | **done** 2026-10-13 |
-| 4.2 | The token in VS Code secret storage, opt-in | public repositories work without a token; a private one needs it and never writes it to disk | **done** 2026-10-13 |
-| 4.3 | The table: repository · pages · owner · changed · state (stale / unowned / gaps) | the state column is computed here from data the API already returned | **done** 2026-10-13 |
-| 4.4 | Multi-root mode: the same table from the open folders, with no network at all | the table renders offline and says so | **done** 2026-10-13 |
-| 4.5 | *Start one* for a repository that carries no registry | **gated** — this writes into a *product* repository, so it is an explicit command with a confirmation, and it needs the owner's agreement before it is built | gated |
+| 5.1 | Feedback intake and routing: each row reaches the page's owner; aging is visible | a row older than 30 days appears without anyone searching for it | **done** against a proposed contract — see below |
+| 5.2 | The staleness report, grouped by owner | it is produced on a schedule and needs no interpretation to act on | **done here**, minus the schedule — see below |
+| 5.3 | ~~The `/_admin/` view — the same data, rendered for the portal~~ | **withdrawn 2026-10-13** — the design's rule is *“nothing under `_admin/` or `_edit/` is in `docfx.json` content: they are generated pages, not documentation”*, and the product repo already generates that folder. `src/admin.ts` and its command are deleted; see phase 4 | — |
 
-**Three calls per repository, only when asked.** `src/dashboard.ts` lists the organisation's repositories, reads each
-one's `docs/help/registry.json` through the contents API, and reads the last commit touching `docs/` — cached in
-`globalState` for an hour, with `Documentation Dashboard: Refresh` to go past the cache. It runs on the command
-and never in the background, count and state computed here from what the API already returned.
+**5.1 reads a shape that is proposed, not agreed.** `09-feedback-subscriptions-notifications.md` was written against
+an endpoint on the T3000 server plus database tables, and `16-management-overview.md` supersedes that hosting model,
+so where a row comes from was never settled. `src/feedback.ts` therefore reads the smallest shape that carries what
+routing needs — `docs/help/feedback.json`, `{ version, rows: [{ page, kind, note, at, state, by }] }` per repository
+— routes each row to its page's owner, and calls out the ones waiting over 30 days in their own section. **The shape
+is the extension's proposal for the docs owner to accept or replace**; with no such file anywhere, the command says
+exactly that instead of reporting “no feedback”.
 
-**Unenthenticated is not enough for a whole organisation, and the report says so.** GitHub allows 60 calls an hour
-without a token and 5,000 with one, so a ~190-call scan stops part-way, names the limit and its reset time, and
-points at *Set a GitHub Token*. The token lives in secret storage (`context.secrets`), never in a setting, a file
-or a log. Two deliberate limits: archived and forked repositories are skipped, and the scan stops at 200
-repositories.
+**5.3 is withdrawn for the same reason phase 4 is, and it is worth stating plainly.** The `_admin/` folder is
+**generated by the product repository's own pipeline** — `docs-registry.mjs` writes its `index.md` — so an
+extension writing a Markdown page beside it was a second writer on a generated surface. The rule I had written
+to guard it (“never overwrite `index.md`”) was the symptom: the honest version of that rule is **never write
+under `_admin/` or `_edit/` at all**. What the site's dashboard needs from this repository is the deep link it
+already gets, not a page.
 
-**What a remote scan can and cannot check.** The registry alone supports the checks a remote reader can make — a
-missing title, an undeclared area, an id that disagrees with its own area and chapter, a duplicated title, a
-duplicated order. It cannot check that a page's *file* exists, which is the one check that needs the working
-tree; so a remote `gaps` count is a floor, never a ceiling.
-
-**Not implemented, deliberately:** reading the token out of the `gh` CLI when secret storage is empty. That is the
-one credential-reading convenience `app-layout.md` allows, and it needs the owner's word before it is built.
-
-**4.3 and 4.4 are one view.** `src/dashboardView.ts` renders both sources in the same vocabulary: the folders you
-have open (measured here, no network at all — this is 4.4, and it is why the view is useful with the network
-unplugged) and the organisation read from the API. Each row is a repository, expanded into the reasons to act on
-it when it needs attention, and each row's tooltip says which of the two sources it came from and therefore how
-much it can be trusted. One deliberate divergence from `app-layout.md`: it is a **tree**, not the mock's table,
-because VS Code has no table view and a webview is not worth it for columns — the columns became the description
-and the tooltip. Recorded in `extension-design.md`, not left as an oversight.
-
-## Phase 5 — feedback and health
-
-| # | Step | Done when |
-|---|---|---|
-| 5.1 | Feedback intake and routing: each row reaches the page's owner; aging is visible | a row older than 30 days appears without anyone searching for it |
-| 5.2 | The staleness report, grouped by owner | it is produced on a schedule and needs no interpretation to act on |
-| 5.3 | The `/_admin/` view — the same data, rendered for the portal | one collector, two renderings; the dashboard never becomes a second source of truth |
+**5.2, and the half of it that does not belong here.** `src/report.ts` produces the report on the *Documentation
+Owed* command: the pages that need attention, grouped by owner, with the reasons in the words of the fix, and
+counts — not lists — for the pages that have merely never been reviewed. It opens as an untitled Markdown
+document, so producing a report writes nothing anywhere. **The cadence is not here**: an editor extension has no
+scheduler, and `11-review-and-cicd.md` §2 already places the weekly job in the product repo's CI. What this
+delivers is the report that job would send — which is the part a maintainer actually reads.
 
 ## Decisions that gate steps
 
@@ -175,7 +201,9 @@ and the tooltip. Recorded in `extension-design.md`, not left as an oversight.
 | The local-AI runtime dependency | **resolved 2026-10-13** — a downloaded binary, not an npm dependency: nothing native ships | — |
 | Which model, and where its weights live | **resolved 2026-10-13** — the user chooses from the catalog; the folder is `temcoKnowledge.ai.modelFolder` | — |
 | Pin the model checksums and sizes | 2.2's follow-up; needs a machine that can reach the file host | the repository owner |
-| May this extension ever write into a product repository beyond a declared-but-missing page file? | 4.5 | the repository owner |
-| The GitHub token: a new PAT, or the one the `gh` CLI already holds | 4.2 | the repository owner |
+| May this extension ever write into a product repository beyond a declared-but-missing page file? | **resolved 2026-10-13** — an empty registry where a folder you have open has none, on a modal confirmation. Never under `_admin/` or `_edit/`, and never anything a generator writes | — |
+| Does the extension render the `/_admin/` dashboard? | **resolved 2026-10-13** — no. The dashboard is a generated page the product repo builds; this extension is its deep-link target, not a second renderer | — |
 | May the extension invoke a product repository's build scripts? | **resolved 2026-10-13** — yes, as VS Code tasks discovered from that repository's own `package.json`; never reimplemented | — |
 | Does it ever deploy the CHM into a T3000 installation? | **resolved 2026-10-13** — never: only the non-deploying `build:help:dry` is invoked, and shipping stays a separate act | — |
+| Where a feedback row comes from | **proposed 2026-10-13** — `docs/help/feedback.json` per repository, in the shape `src/feedback.ts` reads; the docs owner accepts or replaces it | the docs owner |
+| May the extension create a registry in a product repo? | **resolved 2026-10-13** — only in a folder you have open, only empty, on a modal confirmation | — |

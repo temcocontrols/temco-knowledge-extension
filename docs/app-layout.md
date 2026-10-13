@@ -17,7 +17,7 @@ two of the five areas are ours.
 │   │ ! Gaps              │ 6                                   │ [ Draft update ] [ Ask area ]│
 │   │                     │ 7  Point . Type . Unit . Scaling    │ local  qwen2.5-3b  -  offline│
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
-│ PROBLEMS   OUTPUT   TERMINAL   TEMCO KNOWLEDGE                                               │
+│ PROBLEMS   OUTPUT   TERMINAL                                                                 │
 │ !  data-points.md   Order 20 is used by more than one page in "api-reference".               │
 ├──────────────────────────────────────────────────────────────────────────────────────────────┤
 │   335 pages - 12 issues - 341 never reviewed         Markdown  -  Ln 3, Col 1  -  UTF-8      │
@@ -41,43 +41,67 @@ Three properties of this layout are decisions, not accidents:
 3. **Both of our areas exist now.** The Content view is phase 1; the AI panel is phase 2, and the mock above
    is the panel as built — same place, same buttons, so the layout never had to move.
 
-## The dashboard (phase 4)
+## Two worlds, and the seam between them
 
-A second view, for the whole organisation rather than one repository. It needs no clones: the GitHub API
-reports which repos carry a registry, how big it is, who owns it and when it last changed.
+**The dashboard is not in this application.** `00-architecture.md` puts it on the **site**: a **generated
+static page** at `/docs/_admin/` — coverage · stale by owner · docs-owed · unowned pages · broken links ·
+feedback · help-id coverage — noindex, excluded from the PDF, the CHM and the offline zip, and produced by the
+**product repository's** own pipeline (`13-implementation-plan.md` step 1.19 / 24). Nothing in this extension
+generates it, and nothing here writes into `_admin/`: the design's rule is that those are *generated pages, not
+documentation*.
+
+What the extension does in that relationship is be the **hand-off target**. A dashboard row deep-links into the
+editor (`vscode://file/…`), and this is where the page gets fixed:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Temco Knowledge Studio  -  Dashboard                                                         │
-├──────────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                              │
-│  temcocontrols        62 repositories   -   14 documented   -   9 stale   -   3 with gaps    │
-│                                                                                              │
-│  REPOSITORY                      PAGES   OWNER     CHANGED        STATE                      │
-│  T3000Webview-EEZ-Studio           335   docs      2 days         current                    │
-│  T3000_Building_Automation_System  298   docs      3 weeks        12 gaps                    │
-│  T3000Firmware                      96   fw-team   5 months       stale, no owner            │
-│  BACnet-Stack                       54   docs      8 months       stale                      │
-│  T3-Devices                         41   -         1 year         stale, unowned             │
-│  Modbus-Tools                       18   docs      1 month        current                    │
-│  ...                                                                                         │
-│                                                                                              │
-│  48 repositories have no docs/help/registry.json yet       [ Start one ]                     │
-└──────────────────────────────────────────────────────────────────────────────────────────────┘
+┌── PRODUCT REPO ── the content lives here ──┐    ┌── THE EDITOR ── Temco Knowledge Studio / plain VS Code ──┐
+│                                            │    │                                                          │
+│  docs/t3000/**            the pages         │    │  ▣ Temco Knowledge            (activity bar, ours)       │
+│  docs/help/registry.json  the structure     │    │   ┌──────────────────────────────────────────────────┐   │
+│  scripts/docs-*.mjs       the generators    │    │   │ CONTENT                                          │   │
+│                                            │    │   │  ▾ t3000                                         │   │
+│ ┌─ READ SITE (ships) ────────────────────┐ │    │   │    ▾ api-reference                               │   │
+│ │ /docs/          everything published   │ │    │   │      Data Points API   (wrong order)             │   │
+│ │ /docs/feed/*.xml  changelog + releases │ │    │   │        └ why: Order 20 already used              │   │
+│ │ /docs/T3000-Learn.pdf                  │ │    │   │    ▾ trends                                      │   │
+│ │ /docs/T3000-Docs-<v>.zip               │ │    │   │  ! Gaps (12)                                     │   │
+│ └────────────────────────────────────────┘ │    │   └──────────────────────────────────────────────────┘   │
+│                                            │    │                                                          │
+│ ┌─ AUTHORING SURFACE (never ships) ──────┐ │    │   ┌─ right side ──────────────────────────────────────┐   │
+│ │ :8080   docfx preview — authoring only │ │    │   │ TEMCO KNOWLEDGE                        (the AI)    │   │
+│ │                                        │ │    │   │ You  summarise this page                          │   │
+│ │ /docs/_admin/   GENERATED DASHBOARD    │ │    │   │ AI   This page lists the API points; 14 months    │   │
+│ │   coverage · stale by owner ·          │ │    │   │      old. Two points are missing.                 │   │
+│ │   docs-owed · unowned · unreviewed ·   │ │    │   │ [ Draft update ] [ Ask the area ] [ Models… ]     │   │
+│ │   broken links · feedback ·            │ │    │   └───────────────────────────────────────────────────┘   │
+│ │   help-id coverage · health score      │ │    │   ┌─ bottom panel ────────────────────────────────────┐   │
+│ │   noindex · out of PDF/CHM/zip         │ │    │   │ PROBLEMS  OUTPUT  TERMINAL                        │   │
+│ │                                        │ │    │   │  ! data-points.md   Order 20 is used twice        │   │
+│ │   each row  ──►  vscode://file/…  ─────┼─┼────┼──►  the page opens in the editor, ready to fix           │
+│ │   each row  ──►  /docs/edit/<page-id>  │ │    │   └───────────────────────────────────────────────────┘   │
+│ │                  (phase 3, hosted)     │ │    │                                                          │
+│ └────────────────────────────────────────┘ │    │   status bar:  335 pages · 12 issues · 341 never reviewed │
+│                                            │    │                                                          │
+│                                            │    │   Build the Site · Build the Offline Help                │
+│                                            │    │     └── invoke the *product repo's own* scripts          │
+└────────────────────────────────────────────┘    └──────────────────────────────────────────────────────────┘
 ```
 
-Where each column comes from:
-
-| Column | Source |
+| | |
 |---|---|
-| the repository list | `GET /orgs/temcocontrols/repos` |
-| `PAGES`, `OWNER`, gaps | `GET /repos/{owner}/{repo}/contents/docs/help/registry.json` |
-| `CHANGED` | `GET /repos/{owner}/{repo}/commits?path=docs&per_page=1` |
-| `STATE` | computed here: stale, unowned, gaps |
+| **The dashboard** answers *"which pages need work across the organisation?"* — on the site, generated by the product repo, page-level health, never shipped | |
+| **The Content view** answers *"which pages need work in the repository I have open?"* — in the editor, one repository, the reasons as children of the page that has them | |
+| **The same pages, two distances.** Neither is a copy of the other, and neither recomputes what the other owns | |
+| **This extension is where the work happens** — a dashboard row is a hand-off, not a destination | |
 
-Roughly three calls per repo, cached for an hour — well inside the authenticated rate limit. The token lives
-in VS Code's secret storage, and with a multi-root workspace open the same table is produced from local
-folders with no network at all.
+*Start a Registry* appears where it applies rather than in a title bar: as the Content view's empty state, for
+the folder that has no `docs/help/registry.json` yet. It works on a folder **you have open** — a repository you
+have not cloned is refused in words, because starting one there would be a commit made through the API on your
+behalf. Filling the registry it creates is the repository's own generator's job (`npm run docs:registry`).
 
-The dashboard is **not** the portal (that is for readers), **not** a per-page tool (the Content view is), and
-**not** a CI dashboard (it reports documentation state, not build state).
+**Where the AI sits, and why that is a user action.** It belongs on the **right**, beside the page being worked
+on. VS Code has no contribution point that places a container there — `contributes.viewsContainers` accepts
+`activitybar` and `panel` only — so the view is contributed to the panel container and the **workbench docks it
+on the right**: the secondary side bar accepts any view, remembers the position, and a fresh install needs one
+drag. If it must open there by itself, the alternative is an editor-area webview panel opened beside the page
+(`ViewColumn.Beside`), which is a tab rather than a dock. Recorded in `platform-design.md`, not hidden here.
