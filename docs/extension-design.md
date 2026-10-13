@@ -4,10 +4,13 @@
 
 | Module | Owns |
 |---|---|
-| `src/registry.ts` | reading `docs/help/registry.json`, the page id → file rule, the structural checks, the counts. No VS Code UI beyond `Uri`, `WorkspaceFolder` and the filesystem |
+| `src/registry.ts` | reading `docs/help/registry.json` and the generated `index.json`/`page-meta.json`, the page id → file rule, the structural checks, the counts. No VS Code UI beyond `Uri`, `WorkspaceFolder` and the filesystem |
 | `src/tree.ts` | the Content view: which nodes exist, what they show, what a click does |
 | `src/diagnostics.ts` | which issues become Problems, and on which file |
 | `src/extension.ts` | activation, the view and status bar, the commands, the file watcher |
+| `src/ai/catalog.ts` | what can be downloaded: the pinned llama.cpp build with the checksums GitHub publishes, the models on offer, their licences. No network, no filesystem |
+| `src/ai/install.ts` | the model folder, the resumable download and its checksum check, the unpack, and the manifest of what is installed |
+| `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder |
 
 `registry.ts` is deliberately free of presentation: it is the part that would survive replacing the view, and
 the part an AI feature will reuse to know what pages exist.
@@ -29,6 +32,9 @@ Content                        (view container: Temco Knowledge)
 
 - Counts live on the **parents**, because "which area needs attention" is the real question.
 - A page with issues is collapsible and its children are the reasons.
+- A page's tooltip carries what the generator knows and the registry does not: its last change, its headings,
+  and — marked in the description and the icon — whether its `code` moved on since the last review. With
+  `index.json`/`page-meta.json` absent, that block is simply missing and nothing else changes.
 - Clicking a page opens the file; if the file does not exist, the click offers to create it.
 - Areas and chapters are never empty: an area declared in `areas{}` with no pages still appears, which is
   itself information.
@@ -43,27 +49,36 @@ Content                        (view container: Temco Knowledge)
 | `temcoKnowledge.openRegistry` | opens `registry.json` for the folder the node belongs to |
 | `temcoKnowledge.openPage` | opens the page, or offers to create the missing file |
 | `temcoKnowledge.revealPage` | reveals the page in the explorer |
+| `temcoKnowledge.models` | the list of runtimes and models: what is installed, what can be downloaded, which one is in use |
+| `temcoKnowledge.removeModel` | deletes an installed runtime or model, and clears it from the settings when it was the one in use |
+| `temcoKnowledge.openModelFolder` | opens the folder the downloads live in |
 
 ## What refreshes the view
 
 - activation, and any workspace-folder change;
-- a change to `**/docs/help/registry.json` (created, changed, deleted) — the one file whose edits change the
-  shape of the tree;
+- a change to `**/docs/help/registry.json` (created, changed, deleted) — it changes the shape of the tree;
+- a change to `**/docs/help/index.json` or `**/docs/help/page-meta.json` — they change the provenance the items
+  display;
 - an explicit refresh.
 
 Everything else, including saving a page, does not refresh: the tree describes structure, not prose.
 
 ## Rules the code follows
 
-- **One writer, and only on request.** The only write in the whole extension is creating an empty file for a
-  page the registry already declares.
+- **One writer, on request, and never inside a repository.** The only write the extension makes to the folder
+you opened is creating the empty file for a page the registry already declares. What it downloads — the
+runtime, a model, the manifest that records them — goes to its own storage folder, or to the folder a setting
+names.
 - **A diagnostic lands where the fix is** — the page for a page problem, `registry.json` for a missing file
   or an unreadable registry.
 - **Counts are not problems.** `reviewed: null` and empty tag lists are normal in a 335-page registry; as
   warnings they would bury the faults that matter.
 - **No module knows about the fork.** Nothing references `temco-knowledge-studio`, by design.
-- **Nothing is fetched.** The extension makes no network call today; when the dashboard arrives it will be an
-  explicit, opt-in feature with its own settings.
+- **Nothing is fetched unasked.** The only network calls are the runtime and model downloads the user starts
+  from *Models and Runtime*: no telemetry, no update check, no cloud fallback. The dashboard, when it arrives,
+  follows the same rule — an explicit command, and a token in secret storage.
+- **Nothing native ships.** A compiled engine is per-OS; a downloaded one is not, which is what keeps one
+  `.vsix` valid on every platform — our application, plain VS Code, Windows or macOS.
 
 ## Roadmap
 

@@ -43,25 +43,36 @@ Three rules this plan keeps, taken from the design rather than invented here:
 - **Nothing is committed yet.** HEAD is still `initial project skeleton`; everything above sits in the
   working tree. This is a `git` step for the owner, not a code step.
 
-## Phase 2 — the AI · next
+## Phase 2 — the AI · in progress
 
 The phase the repository exists for. The model runs **locally** — no cloud, no keys, no documentation text
 leaving the building — it is **draft-only**, and it is a setting rather than a hard-coded choice, so a
 different model later changes nothing else.
 
-| # | Step | Done when |
-|---|---|---|
-| 2.1 | Read the generated neighbours: `docs/help/index.json` (headings, git provenance, `stale`) and `page-meta.json` when present | a page shows its headings and last commit; with the files absent everything except provenance still works |
-| 2.2 | **Model manager** — a setting for the model and its directory (default: extension global storage), download with resume, licence recorded, verify, remove | a model downloads once, survives a restart, and no model file is ever inside a repository |
-| 2.3 | **The runtime** — the model loaded in a worker thread, on first use, unloaded when idle | the extension host never blocks; no model loaded means the rest of the extension is unaffected |
-| 2.4 | **The panel** — the `Temco Knowledge` view: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | the panel reads the open document and `registry.ts`, and holds no logic of its own |
-| 2.5 | **`Draft update`** — commit range from git (commits touching `docs/**` and the page's `code[]` globs), a versioned prompt file, the answer applied as a workspace edit | accepting is a diff, rejecting is `Ctrl+Z`, and the draft names its commit range and prompt version |
-| 2.6 | **`Ask the area`** — candidates from the area and tags, an answer that cites pages; low confidence returns search results instead of a synthesis; `stale` pages excluded or explicitly warned | every answer cites a page that exists, and a stale page is never cited silently |
-| 2.7 | **Guardrails as code** — degradable, traceable, no secrets or customer data in prompts (commit metadata, paths and page text only), cost bounded | with the model deleted, every phase-1 feature and every command still works |
+| # | Step | Done when | State |
+|---|---|---|---|
+| 2.1 | Read the generated neighbours: `docs/help/index.json` (headings, git provenance, `stale`) and `page-meta.json` when present | a page shows its headings and last commit; with the files absent everything except provenance still works | **done** 2026-10-13 |
+| 2.2 | **The catalog and the downloader** — a list of runtimes and models to choose from, downloaded on request into a folder of the user's choosing, resumable, checksum-verified where the catalog pins one, removable | a model downloads once, survives a restart, and no model file is ever inside a repository | **done** 2026-10-13 |
+| 2.3 | **The runtime process** — the downloaded `llama-server` started on a private port, health-checked before use, stopped when idle | the extension host never blocks; with nothing installed, every phase-1 feature is unaffected | next |
+| 2.4 | **The panel** — the `Temco Knowledge` view: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | the panel reads the open document and `registry.ts`, and holds no logic of its own | planned |
+| 2.5 | **`Draft update`** — commit range from git (commits touching `docs/**` and the page's `code[]` globs), a versioned prompt file, the answer applied as a workspace edit | accepting is a diff, rejecting is `Ctrl+Z`, and the draft names its commit range and prompt version | planned |
+| 2.6 | **`Ask the area`** — candidates from the area and tags, an answer that cites pages; low confidence returns search results instead of a synthesis; `stale` pages excluded or explicitly warned | every answer cites a page that exists, and a stale page is never cited silently | planned |
+| 2.7 | **Guardrails as code** — degradable, traceable, no secrets or customer data in prompts (commit metadata, paths and page text only), cost bounded | with the model deleted, every phase-1 feature and every command still works | planned |
 
-**Blocked, and this is the one thing to decide before 2.3:** the runtime is a *runtime dependency*, and the
-repository's rule is to ask before adding one. The choice (`llama.cpp` binding, ONNX, or another) gates 2.3
-and everything after it.
+As generated on 2026-10-12: 318 pages, every one with headings and provenance. **`code` globs are empty and
+`stale` is `false` for all of them**, so the stale marker stays dark until the product repo fills the globs and
+computes the verdict (`05-content-and-registry.md` §4). The extension reads that verdict; it never computes it.
+
+**Nothing native ships.** A compiled inference engine is per-OS; a downloaded one is not — and that is what keeps
+one `.vsix` valid on every platform and the package small. The pinned runtime is llama.cpp `b11577`, CPU builds
+only, each with the sha256 GitHub itself publishes; the archive is unpacked with the platform's own `tar`; and
+every model shows its licence before anything is fetched. Two follow-ups needing a machine that can reach the
+file host: **pin the model checksums and sizes** (they ship as `sha256: ''`, which is refused unless
+`ai.allowUnpinned` is on and then confirmed), and keep `RUNTIME_RELEASE` current.
+
+**Settled 2026-10-13:** the local AI adds **no npm runtime dependency**. The runtime is a binary the user
+chooses to download, so the rule about asking before adding a dependency is met by asking for the download
+instead — and the extension still installs into an ordinary editor on any OS.
 
 ## Phase 3 — publishing
 
@@ -93,7 +104,8 @@ and everything after it.
 
 | Decision | Gates | Who |
 |---|---|---|
-| The local-AI runtime dependency | 2.3, and everything after it | the repository owner |
-| Which model, and where its weights live | 2.2 | the repository owner |
+| The local-AI runtime dependency | **resolved 2026-10-13** — a downloaded binary, not an npm dependency: nothing native ships | — |
+| Which model, and where its weights live | **resolved 2026-10-13** — the user chooses from the catalog; the folder is `temcoKnowledge.ai.modelFolder` | — |
+| Pin the model checksums and sizes | 2.2's follow-up; needs a machine that can reach the file host | the repository owner |
 | May this extension ever write into a product repository beyond a declared-but-missing page file? | 4.5 | the repository owner |
 | The GitHub token: a new PAT, or the one the `gh` CLI already holds | 4.2 | the repository owner |

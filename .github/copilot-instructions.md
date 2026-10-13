@@ -38,6 +38,9 @@ belong to the **product** repository, which keeps the content and the publishing
    user's behalf.
 3. **Never publish.** Building and shipping artifacts happens through commands in the product repo. This
    extension may invoke them, never reimplement them.
+4. **Nothing native ships, and downloads are asked for.** A compiled inference engine is per-OS, so the
+   runtime and the models are downloaded on request into the user's own folder — never bundled, never written
+   into a repository, always a command the user ran.
 4. **No dependency on the fork.** If a feature only works inside `temco-knowledge-studio`, it is in the wrong
    place. The extension must keep working when installed into ordinary VS Code — that is the whole reason it
    is an extension.
@@ -47,10 +50,11 @@ belong to the **product** repository, which keeps the content and the publishing
 ## Where things are
 
 ```
-src/registry.ts      reads docs/help/registry.json, builds areas -> chapters -> pages, runs the checks
-src/tree.ts          the Content view (areas, chapters, pages, Gaps, issue children)
+src/registry.ts      reads docs/help/registry.json + the generated index.json/page-meta.json, runs the checks
+src/tree.ts          the Content view (areas, chapters, pages, Gaps, issue children, provenance in tooltips)
 src/diagnostics.ts   turns issues into Problems, in the file that has to be fixed
 src/extension.ts     activation: view, status bar, commands, file watcher
+src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack), commands.ts (the list)
 media/knowledge.svg  the activity-bar icon
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
@@ -63,7 +67,9 @@ Contributed surface lives in `package.json`: one view container (`temcoKnowledge
 - **A diagnostic must land where the fix is.** A problem with an existing page is marked in that page; a
   registered page whose file is missing is marked on `registry.json`.
 - **Counts are not problems.** `reviewed: null` and empty `tags`/`keywords` are normal in a large registry.
-  Surfacing them as warnings buries the real faults, so they are counts in the tree and the status bar.
+  Surfacing them as warnings buries the real faults, so they are counts in the tree and the status bar. The
+  same holds for staleness: the generator's `stale` verdict is read from `index.json` and shown as a marker and
+  a count — never recomputed here, never a problem.
 - **Comments explain why, not what.** Keep them short and truthful; if a comment and the code disagree, the
   comment is wrong.
 - **English only** in code, comments and user-visible strings.

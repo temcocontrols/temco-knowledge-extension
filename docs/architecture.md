@@ -46,6 +46,9 @@ C:\QN\temcocontrols\
    check    file exists · id agrees with area/chapter · title unique · order unique
         │
         ▼
+   fetch    phase 2 · the runtime and a model are downloaded on request, into the user's own folder
+        │
+        ▼
    draft    phase 2 · the local AI reads a commit range and proposes page edits
         │
         ▼

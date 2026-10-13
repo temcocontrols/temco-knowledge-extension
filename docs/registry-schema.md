@@ -62,10 +62,20 @@ paths: the id is the path.
 
 The product repo also emits, and this extension may read:
 
-- `docs/help/index.json` — headings and git provenance per page (last commit, date).
-- `docs/help/page-meta.json` — the metadata bar values rendered on each published page.
+- `docs/help/index.json` — per page: its headings, the last commit that touched it (author, sha, date), and the
+  generator's `stale` verdict.
+- `docs/help/page-meta.json` — the same provenance in the smaller shape the published page reads.
 
-Neither is required: if they are absent, everything except provenance-related features still works.
+**Neither is required.** Absent, the extension works exactly as before; only provenance goes missing. A
+malformed one is a **warning on that file** — the fix is to regenerate it in the product repo — never an error,
+because it hides nothing else.
+
+What the extension shows from them: a page's last change and headings in its tooltip, a `stale` marker on the
+page (description and icon), and a stale count in the repository and area tooltips plus the status report.
+
+**`stale` is read, never computed here.** The verdict — a commit touched a path the page claims in `code`,
+after its last review — belongs to the product repo's generator (`05-content-and-registry.md` §4). Two answers
+to that question would be worse than none, so the extension only repeats the generator's answer.
 
 ## Structural checks
 
