@@ -78,6 +78,11 @@
         "command": "temcoKnowledge.openModelFolder",
         "title": "Open Model Folder",
         "icon": "$(file-directory)"
+      },
+      {
+        "command": "temcoKnowledge.aiStatus",
+        "title": "AI Status",
+        "icon": "$(pulse)"
       }
     ],
     "menus": {
@@ -143,6 +148,12 @@
           "type": "string",
           "default": "",
           "markdownDescription": "Id of the model in use. Chosen from **Temco Knowledge: Models and Runtime**."
+        },
+        "temcoKnowledge.ai.idleMinutes": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "markdownDescription": "How long the local server may sit unused before it is stopped and its memory released. `0` keeps it running until the window closes."
         }
       }
     }

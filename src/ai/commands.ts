@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import { CatalogEntry, MODELS, entryById, formatBytes, runtimeFor } from './catalog';
 import { InstalledArtifact, install, installedArtifacts, modelRoot, uninstall } from './install';
+import { aiStatus, showAiLog, stopAiServer } from './runtime';
 
 interface Choice extends vscode.QuickPickItem {
   entry?: CatalogEntry;
@@ -17,14 +18,40 @@ interface Removal extends vscode.QuickPickItem {
   artifact: InstalledArtifact;
 }
 
-export function registerModelCommands(context: vscode.ExtensionContext): void {
+export function registerAiCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('temcoKnowledge.models', () => chooseModel(context)),
     vscode.commands.registerCommand('temcoKnowledge.removeModel', () => removeModel(context)),
     vscode.commands.registerCommand('temcoKnowledge.openModelFolder', async () => {
       await vscode.env.openExternal(vscode.Uri.file(modelRoot(context)));
-    })
+    }),
+    vscode.commands.registerCommand('temcoKnowledge.aiStatus', () => showAiStatus(context))
   );
+}
+
+/** One place to see which runtime and model are in use, and whether the server is up. */
+async function showAiStatus(context: vscode.ExtensionContext): Promise<void> {
+  const status = aiStatus(context);
+  const label = status.model ? entryById(status.model.id)?.label ?? status.model.id : undefined;
+  const summary = label
+    ? `${status.running ? 'running' : 'stopped'} · ${label}`
+    : 'nothing installed yet — no model, so no server';
+
+  const items = status.running
+    ? ['Stop the server', 'Show the log', 'Models and Runtime']
+    : ['Models and Runtime', 'Show the log'];
+  const answer = await vscode.window.showInformationMessage(
+    `Temco Knowledge: local AI — ${summary}`,
+    ...items
+  );
+
+  if (answer === 'Stop the server') {
+    stopAiServer();
+  } else if (answer === 'Show the log') {
+    showAiLog();
+  } else if (answer === 'Models and Runtime') {
+    await vscode.commands.executeCommand('temcoKnowledge.models');
+  }
 }
 
 async function chooseModel(context: vscode.ExtensionContext): Promise<void> {
@@ -146,8 +173,17 @@ async function removeModel(context: vscode.ExtensionContext): Promise<void> {
     { modal: true, detail: `This deletes:\n${picked.artifact.path}` },
     'Remove'
   );
+  // A running server must not outlive the files it was started from.
+  const before = aiStatus(context);
   if (answer !== 'Remove' || !uninstall(context, picked.artifact.id)) {
     return;
+  }
+  const wasServing =
+    before.running !== undefined &&
+    (before.running.modelPath === picked.artifact.path ||
+      before.runtime?.path === picked.artifact.path);
+  if (wasServing) {
+    stopAiServer();
   }
 
   // What has been removed must not stay selected.

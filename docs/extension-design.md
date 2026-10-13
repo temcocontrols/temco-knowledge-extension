@@ -10,7 +10,8 @@
 | `src/extension.ts` | activation, the view and status bar, the commands, the file watcher |
 | `src/ai/catalog.ts` | what can be downloaded: the pinned llama.cpp build with the checksums GitHub publishes, the models on offer, their licences. No network, no filesystem |
 | `src/ai/install.ts` | the model folder, the resumable download and its checksum check, the unpack, and the manifest of what is installed |
-| `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder |
+| `src/ai/runtime.ts` | the local server process: started on demand on a loopback port, health-checked, stopped when idle — and the single `complete()` call everything else uses |
+| `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder, and the AI's status |
 
 `registry.ts` is deliberately free of presentation: it is the part that would survive replacing the view, and
 the part an AI feature will reuse to know what pages exist.
@@ -52,6 +53,7 @@ Content                        (view container: Temco Knowledge)
 | `temcoKnowledge.models` | the list of runtimes and models: what is installed, what can be downloaded, which one is in use |
 | `temcoKnowledge.removeModel` | deletes an installed runtime or model, and clears it from the settings when it was the one in use |
 | `temcoKnowledge.openModelFolder` | opens the folder the downloads live in |
+| `temcoKnowledge.aiStatus` | which runtime and model are in use, whether the server is running, and how to stop it or read its log |
 
 ## What refreshes the view
 
@@ -79,6 +81,10 @@ names.
   follows the same rule — an explicit command, and a token in secret storage.
 - **Nothing native ships.** A compiled engine is per-OS; a downloaded one is not, which is what keeps one
   `.vsix` valid on every platform — our application, plain VS Code, Windows or macOS.
+- **A process, only while it is wanted.** The local server starts when something asks the AI for an answer,
+  never at activation; it listens on loopback only; and it is stopped when idle, when its model is removed,
+  and when the window closes. The extension holds no model in its own process, so nothing to load or unload
+  blockingly.
 
 ## Roadmap
 

@@ -19,6 +19,10 @@
   machine and a choice of models, downloads the one picked into the user's own folder (resumable, checked
   against the catalog's sha256), unpacks it with the platform's `tar`, records it in a manifest, and can remove
   it again. Nothing native ships with the extension, and every download is a command the user ran.
+- **The local AI's second slice: the runtime process.** The downloaded `llama-server` is started on demand on
+  a loopback port (`--host 127.0.0.1`, never the LAN), waited for with a `/health` check, and stopped when idle
+  (`temcoKnowledge.ai.idleMinutes`), when its model is removed, or when the window closes. *AI Status* names the
+  runtime and model in use and can stop the server or open its log.
 
 ## 0.0.1
 

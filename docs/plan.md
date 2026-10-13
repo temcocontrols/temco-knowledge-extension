@@ -53,11 +53,17 @@ different model later changes nothing else.
 |---|---|---|---|
 | 2.1 | Read the generated neighbours: `docs/help/index.json` (headings, git provenance, `stale`) and `page-meta.json` when present | a page shows its headings and last commit; with the files absent everything except provenance still works | **done** 2026-10-13 |
 | 2.2 | **The catalog and the downloader** — a list of runtimes and models to choose from, downloaded on request into a folder of the user's choosing, resumable, checksum-verified where the catalog pins one, removable | a model downloads once, survives a restart, and no model file is ever inside a repository | **done** 2026-10-13 |
-| 2.3 | **The runtime process** — the downloaded `llama-server` started on a private port, health-checked before use, stopped when idle | the extension host never blocks; with nothing installed, every phase-1 feature is unaffected | next |
-| 2.4 | **The panel** — the `Temco Knowledge` view: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | the panel reads the open document and `registry.ts`, and holds no logic of its own | planned |
+| 2.3 | **The runtime process** — the downloaded `llama-server` started on demand on a loopback port, health-checked before use, stopped when idle | the extension host never blocks; with nothing installed, every phase-1 feature is unaffected | **done** 2026-10-13 |
+| 2.4 | **The panel** — the `Temco Knowledge` view: chat about the open page, `Draft update`, `Ask the area`, and which model is loaded | the panel reads the open document and `registry.ts`, and holds no logic of its own | next |
 | 2.5 | **`Draft update`** — commit range from git (commits touching `docs/**` and the page's `code[]` globs), a versioned prompt file, the answer applied as a workspace edit | accepting is a diff, rejecting is `Ctrl+Z`, and the draft names its commit range and prompt version | planned |
 | 2.6 | **`Ask the area`** — candidates from the area and tags, an answer that cites pages; low confidence returns search results instead of a synthesis; `stale` pages excluded or explicitly warned | every answer cites a page that exists, and a stale page is never cited silently | planned |
 | 2.7 | **Guardrails as code** — degradable, traceable, no secrets or customer data in prompts (commit metadata, paths and page text only), cost bounded | with the model deleted, every phase-1 feature and every command still works | planned |
+
+**The server, not a library.** `llama-server` is a program the user downloaded; the extension starts it with
+`--host 127.0.0.1` — never the LAN — waits for `/health` to answer 200, and asks it questions over HTTP. It
+starts when something needs it, never at activation, and stops after `ai.idleMinutes` of no use, on
+`deactivate`, or if it never became ready. One call is exposed to the rest of the extension —
+`complete(messages, onToken)` — so the provider behind it can change without the pipeline noticing.
 
 As generated on 2026-10-12: 318 pages, every one with headings and provenance. **`code` globs are empty and
 `stale` is `false` for all of them**, so the stale marker stays dark until the product repo fills the globs and

@@ -5,7 +5,8 @@
 // without an explicit command, and nothing is published from here at all.
 
 import * as vscode from 'vscode';
-import { registerModelCommands } from './ai/commands';
+import { registerAiCommands } from './ai/commands';
+import { disposeAi } from './ai/runtime';
 import { publishDiagnostics } from './diagnostics';
 import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
 import { KnowledgeNode, KnowledgeTreeProvider, pageFromNode } from './tree';
@@ -166,13 +167,14 @@ export function activate(context: vscode.ExtensionContext): void {
     );
   }
 
-  registerModelCommands(context);
+  registerAiCommands(context);
 
   void refresh();
 }
 
 export function deactivate(): void {
-  // Nothing to release: no server, no background work, no model loaded.
+  // The local AI may have left a server process running; nothing else is holding anything open.
+  disposeAi();
 }
 
 /** A new page starts as a title and nothing else — the structure lives in the registry, not in front matter. */

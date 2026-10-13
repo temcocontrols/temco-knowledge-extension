@@ -49,6 +49,9 @@ C:\QN\temcocontrols\
    fetch    phase 2 · the runtime and a model are downloaded on request, into the user's own folder
         │
         ▼
+   serve    phase 2 · the local server starts on demand, on loopback only, and stops when it is idle
+        │
+        ▼
    draft    phase 2 · the local AI reads a commit range and proposes page edits
         │
         ▼

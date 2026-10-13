@@ -40,7 +40,8 @@ belong to the **product** repository, which keeps the content and the publishing
    extension may invoke them, never reimplement them.
 4. **Nothing native ships, and downloads are asked for.** A compiled inference engine is per-OS, so the
    runtime and the models are downloaded on request into the user's own folder — never bundled, never written
-   into a repository, always a command the user ran.
+   into a repository, always a command the user ran. The runtime is a normal program run as a child process,
+   on loopback only, started when it is needed and stopped when it is not.
 4. **No dependency on the fork.** If a feature only works inside `temco-knowledge-studio`, it is in the wrong
    place. The extension must keep working when installed into ordinary VS Code — that is the whole reason it
    is an extension.
@@ -54,7 +55,8 @@ src/registry.ts      reads docs/help/registry.json + the generated index.json/pa
 src/tree.ts          the Content view (areas, chapters, pages, Gaps, issue children, provenance in tooltips)
 src/diagnostics.ts   turns issues into Problems, in the file that has to be fixed
 src/extension.ts     activation: view, status bar, commands, file watcher
-src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack), commands.ts (the list)
+src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack),
+                     runtime.ts (the local server process), commands.ts (the list + AI status)
 media/knowledge.svg  the activity-bar icon
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
