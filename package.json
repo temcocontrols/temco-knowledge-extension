@@ -32,6 +32,10 @@
         {
           "id": "temcoKnowledge.pages",
           "name": "Content"
+        },
+        {
+          "id": "temcoKnowledge.dashboard",
+          "name": "Organisation"
         }
       ],
       "panel": [
@@ -101,6 +105,26 @@
         "command": "temcoKnowledge.buildHelp",
         "title": "Build the Offline Help",
         "icon": "$(book)"
+      },
+      {
+        "command": "temcoKnowledge.dashboard",
+        "title": "Documentation Dashboard",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "temcoKnowledge.dashboardRefresh",
+        "title": "Documentation Dashboard: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "temcoKnowledge.setGithubToken",
+        "title": "Set a GitHub Token",
+        "icon": "$(key)"
+      },
+      {
+        "command": "temcoKnowledge.openRepository",
+        "title": "Open Repository",
+        "icon": "$(link-external)"
       }
     ],
     "menus": {
@@ -109,6 +133,16 @@
           "command": "temcoKnowledge.validate",
           "when": "view == temcoKnowledge.pages",
           "group": "navigation@1"
+        },
+        {
+          "command": "temcoKnowledge.dashboard",
+          "when": "view == temcoKnowledge.dashboard",
+          "group": "navigation@1"
+        },
+        {
+          "command": "temcoKnowledge.dashboardRefresh",
+          "when": "view == temcoKnowledge.dashboard",
+          "group": "navigation@2"
         },
         {
           "command": "temcoKnowledge.openRegistry",
@@ -172,6 +206,11 @@
           "default": 10,
           "minimum": 0,
           "markdownDescription": "How long the local server may sit unused before it is stopped and its memory released. `0` keeps it running until the window closes."
+        },
+        "temcoKnowledge.dashboard.owner": {
+          "type": "string",
+          "default": "temcocontrols",
+          "markdownDescription": "The GitHub organisation the dashboard reads. Its repositories are listed and each one's `docs/help/registry.json` counted — no clone, no build."
         }
       }
     }

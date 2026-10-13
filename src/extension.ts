@@ -9,6 +9,8 @@ import { registerAiCommands } from './ai/commands';
 import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
 import { registerBuildCommands } from './builds';
+import { registerDashboardCommands } from './dashboard';
+import { DASHBOARD_VIEW_ID, DashboardView, openRepository } from './dashboardView';
 import { publishDiagnostics } from './diagnostics';
 import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
 import { KnowledgeNode, KnowledgeTreeProvider, pageFromNode } from './tree';
@@ -46,6 +48,14 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeActiveTextEditor(() => panel.refresh())
   );
 
+  const dashboard = new DashboardView(context, () => roots);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider(DASHBOARD_VIEW_ID, dashboard),
+    vscode.commands.registerCommand('temcoKnowledge.openRepository', (node?: unknown) =>
+      openRepository(node)
+    )
+  );
+
   const refresh = async (): Promise<void> => {
     const broken: BrokenRegistry[] = [];
     roots = [];
@@ -73,6 +83,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     updateStatus(status, roots, broken);
     panel.refresh();
+    dashboard.refresh();
   };
 
   const report = async (): Promise<void> => {
@@ -181,6 +192,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerAiCommands(context);
   registerBuildCommands(context, () => roots, output);
+  registerDashboardCommands(context, output, dashboard);
 
   void refresh();
 }

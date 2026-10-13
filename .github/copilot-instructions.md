@@ -57,6 +57,8 @@ src/tree.ts          the Content view (areas, chapters, pages, Gaps, issue child
 src/diagnostics.ts   turns issues into Problems, in the file that has to be fixed
 src/extension.ts     activation: view, status bar, commands, file watcher
 src/builds.ts        invokes the product repo's own build scripts (never the deploying one)
+src/dashboard.ts     reads the organisation from the GitHub API, cached, on command only (token in secrets)
+src/dashboardView.ts the Organisation view: local rows and API rows, both in the same words
 src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack),
                      runtime.ts (the local server process), prompts.ts (the versioned instructions),
                      history.ts (the commit range), citations.ts (what an answer pointed at),
@@ -67,8 +69,8 @@ prompts/             the instruction text the AI receives (system.md, ask.md, dr
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
 
-Contributed surface lives in `package.json`: one view container (`temcoKnowledge`), one view
-(`temcoKnowledge.pages`) and the commands — all named `temcoKnowledge.*`.
+Contributed surface lives in `package.json`: one view container (`temcoKnowledge`) holding the Content and
+Organisation views, one webview panel (`temcoKnowledge.ai`), and the commands — all named `temcoKnowledge.*`.
 
 ## Conventions
 

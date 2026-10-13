@@ -58,7 +58,7 @@ export function aiStatus(context: vscode.ExtensionContext): AiStatus {
  */
 export async function startAiServer(context: vscode.ExtensionContext): Promise<AiServerInfo> {
   if (info && child && child.exitCode === null) {
-    touchIdle(context);
+    touchIdle();
     return info;
   }
   if (!starting) {
@@ -67,7 +67,7 @@ export async function startAiServer(context: vscode.ExtensionContext): Promise<A
     });
   }
   const server = await starting;
-  touchIdle(context);
+  touchIdle();
   return server;
 }
 
@@ -119,7 +119,7 @@ export async function complete(
     max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
   });
   const response = await post(server.port, '/v1/chat/completions', payload, options.onToken, options.token);
-  touchIdle(context);
+  touchIdle();
   return response;
 }
 
@@ -351,7 +351,7 @@ function freePort(): Promise<number> {
   });
 }
 
-function touchIdle(context: vscode.ExtensionContext): void {
+function touchIdle(): void {
   if (idleTimer) {
     clearTimeout(idleTimer);
     idleTimer = undefined;

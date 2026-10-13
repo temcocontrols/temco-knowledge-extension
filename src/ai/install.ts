@@ -104,7 +104,11 @@ export async function install(
       const archive = path.join(root, entry.file);
       progress.report({ message: `downloading (${formatBytes(entry.bytes)})` });
       const { sha256, bytes } = await download(entry.url, archive, entry.sha256, progress, token);
-      token.throwIfCancellationRequested();
+      // Cancellation is reported by the download itself; this is the guard for the moment between its return
+      // and unpacking, where an abandoned install must not leave a half-unpacked runtime behind.
+      if (token.isCancellationRequested) {
+        throw new Error('the install was cancelled');
+      }
 
       let installedPath = archive;
       if (entry.kind === 'runtime') {

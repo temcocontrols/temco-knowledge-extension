@@ -46,6 +46,16 @@
   then report the artifacts as path, size and time. Success is a file that did not exist before and does now,
   because the CHM build's exit code cannot be trusted. The deploying help build is refused with a reason rather
   than run, since it copies the CHM into a T3000 installation.
+- **The organisation dashboard, read over the API.** *Documentation Dashboard* lists an organisation's
+  repositories, reads each `docs/help/registry.json` and the last commit touching `docs/`, and writes repository,
+  pages, owner, changed and state to the output channel — cached for an hour, with *Refresh* to pass the cache,
+  and *Set a GitHub Token* storing a token in secret storage (never in a setting or a file). Unauthenticated it
+  stops part-way and names GitHub's own limit; a remote scan reports the gaps the registry alone can show.
+- **The Organisation view.** A second view in the same container, with two sources in one vocabulary: the folders
+  you have open (measured here — no network, and the checks see the files themselves) and the organisation read
+  from GitHub (cached; a floor, because a remote reader cannot see files). A repository that needs attention
+  expands into the reasons to act on it, and each row's tooltip says which source it came from. A tree rather
+  than `app-layout.md`'s table, since VS Code has no table view — the columns became the description and tooltip.
 
 ## 0.0.1
 

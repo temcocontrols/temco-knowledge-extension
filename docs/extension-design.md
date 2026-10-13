@@ -17,6 +17,8 @@
 | `src/ai/panel.ts` | the `Temco Knowledge` panel: chat about the open page, `Draft update` as a diff, `Ask the area`, and the model line. Decides nothing itself |
 | `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder, and the AI's status |
 | `src/builds.ts` | the product repo's own builds, invoked as VS Code tasks and judged by the artifact they leave — never by an exit code, and never the form that deploys |
+| `src/dashboard.ts` | the organisation read from the GitHub API: the repository list, each registry, the last commit touching `docs/`, cached for an hour |
+| `src/dashboardView.ts` | the Organisation view: an open-folder row and an API row, both in the same words, and the reasons under the ones that need attention |
 
 `registry.ts` is deliberately free of presentation: it is the part that would survive replacing the view, and
 the part an AI feature will reuse to know what pages exist.
@@ -68,6 +70,29 @@ Temco Knowledge                                     (panel: the AI, bottom area)
 - **With nothing installed the panel still opens** and says what to download, so the extension never looks
   broken — the AI is optional the whole way down.
 
+## The organisation view
+
+```
+Temco Knowledge Studio — ORGANISATION
+├─ Open folders                  (measured here: no network, and the checks see the files)
+│  └─ T3000Webview-EEZ-Studio   318 pages · 2 days · current
+├─ temcocontrols                 62 repositories      (read from GitHub, cached an hour)
+│  ├─ T3000_Building_Automation_System  298 pages · 3 weeks · 12 gaps
+│  │  └─ 12 gaps — open the repository to see them on the pages
+│  └─ …
+└─ Run “Documentation Dashboard” to read the organisation       (until it has been run)
+```
+
+- **Two sources, never mixed**, and every row says which it is: the folders you have open (exact — the same
+  checks the Content view runs, including whether a registered page's file exists) and the organisation read
+  over the API (a floor, because a remote reader cannot see files). Offline, the first still renders in full and
+  the header says when GitHub was last read.
+- **A tree, not a table.** VS Code has no table view and `app-layout.md` mocks one; rather than add a webview for
+  columns, the columns became the row's description and tooltip. Recorded here because it is a deliberate
+  divergence from the mock, not an oversight.
+- **Problems first.** A repository that needs attention is collapsible, and its children are the reasons to act
+  on — the same shape the Content view uses for a page.
+
 ## Commands
 
 | Command | Does |
@@ -84,6 +109,10 @@ Temco Knowledge                                     (panel: the AI, bottom area)
 | `temcoKnowledge.aiStatus` | which runtime and model are in use, whether the server is running, and how to stop it or read its log |
 | `temcoKnowledge.buildSite` | invokes the repository's own `docs:site` as a task and reports the files it produced |
 | `temcoKnowledge.buildHelp` | invokes the non-deploying help build (`build:help:dry`) and reports the CHM it produced |
+| `temcoKnowledge.dashboard` | reads the organisation from GitHub (cached an hour) and writes the table to the output channel |
+| `temcoKnowledge.dashboardRefresh` | the same, past the cache |
+| `temcoKnowledge.setGithubToken` | stores a token in secret storage, or clears the one stored |
+| `temcoKnowledge.openRepository` | opens a row: the folder for a locally measured row, GitHub for one read over the API |
 
 ## What refreshes the view
 
@@ -107,8 +136,8 @@ names.
   warnings they would bury the faults that matter.
 - **No module knows about the fork.** Nothing references `temco-knowledge-studio`, by design.
 - **Nothing is fetched unasked.** The only network calls are the runtime and model downloads the user starts
-  from *Models and Runtime*: no telemetry, no update check, no cloud fallback. The dashboard, when it arrives,
-  follows the same rule — an explicit command, and a token in secret storage.
+  from *Models and Runtime*, and the dashboard read the user starts from *Documentation Dashboard*: no telemetry,
+  no update check, no background refresh. A token lives in secret storage, never in a file or a setting.
 - **Nothing native ships.** A compiled engine is per-OS; a downloaded one is not, which is what keeps one
   `.vsix` valid on every platform — our application, plain VS Code, Windows or macOS.
 - **Building is not shipping.** The build commands invoke the repository's own scripts and report what those

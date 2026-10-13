@@ -123,15 +123,42 @@ inherently writes into the product layout (`T3000_Building_Automation_System\Hel
 is a different repository again; the search for the artifact looks there by the folder's *name*, never by hard
 typing another repository's path.
 
-## Phase 4 — the dashboard
+## Phase 4 — the dashboard · one step gated
 
-| # | Step | Done when |
-|---|---|---|
-| 4.1 | The collector: the organisation's repositories, each one's `docs/help/registry.json`, and the last commit touching `docs/` | ~3 calls per repository, cached for an hour |
-| 4.2 | The token in VS Code secret storage, opt-in | public repositories work without a token; a private one needs it and never writes it to disk |
-| 4.3 | The table: repository · pages · owner · changed · state (stale / unowned / gaps) | the state column is computed here from data the API already returned |
-| 4.4 | Multi-root mode: the same table from the open folders, with no network at all | the table renders offline and says so |
-| 4.5 | *Start one* for a repository that carries no registry | **gated** — this writes into a *product* repository, so it is an explicit command with a confirmation, and it needs the owner's agreement before it is built |
+| # | Step | Done when | State |
+|---|---|---|---|
+| 4.1 | The collector: the organisation's repositories, each one's `docs/help/registry.json`, and the last commit touching `docs/` | ~3 calls per repository, cached for an hour | **done** 2026-10-13 |
+| 4.2 | The token in VS Code secret storage, opt-in | public repositories work without a token; a private one needs it and never writes it to disk | **done** 2026-10-13 |
+| 4.3 | The table: repository · pages · owner · changed · state (stale / unowned / gaps) | the state column is computed here from data the API already returned | **done** 2026-10-13 |
+| 4.4 | Multi-root mode: the same table from the open folders, with no network at all | the table renders offline and says so | **done** 2026-10-13 |
+| 4.5 | *Start one* for a repository that carries no registry | **gated** — this writes into a *product* repository, so it is an explicit command with a confirmation, and it needs the owner's agreement before it is built | gated |
+
+**Three calls per repository, only when asked.** `src/dashboard.ts` lists the organisation's repositories, reads each
+one's `docs/help/registry.json` through the contents API, and reads the last commit touching `docs/` — cached in
+`globalState` for an hour, with `Documentation Dashboard: Refresh` to go past the cache. It runs on the command
+and never in the background, count and state computed here from what the API already returned.
+
+**Unenthenticated is not enough for a whole organisation, and the report says so.** GitHub allows 60 calls an hour
+without a token and 5,000 with one, so a ~190-call scan stops part-way, names the limit and its reset time, and
+points at *Set a GitHub Token*. The token lives in secret storage (`context.secrets`), never in a setting, a file
+or a log. Two deliberate limits: archived and forked repositories are skipped, and the scan stops at 200
+repositories.
+
+**What a remote scan can and cannot check.** The registry alone supports the checks a remote reader can make — a
+missing title, an undeclared area, an id that disagrees with its own area and chapter, a duplicated title, a
+duplicated order. It cannot check that a page's *file* exists, which is the one check that needs the working
+tree; so a remote `gaps` count is a floor, never a ceiling.
+
+**Not implemented, deliberately:** reading the token out of the `gh` CLI when secret storage is empty. That is the
+one credential-reading convenience `app-layout.md` allows, and it needs the owner's word before it is built.
+
+**4.3 and 4.4 are one view.** `src/dashboardView.ts` renders both sources in the same vocabulary: the folders you
+have open (measured here, no network at all — this is 4.4, and it is why the view is useful with the network
+unplugged) and the organisation read from the API. Each row is a repository, expanded into the reasons to act on
+it when it needs attention, and each row's tooltip says which of the two sources it came from and therefore how
+much it can be trusted. One deliberate divergence from `app-layout.md`: it is a **tree**, not the mock's table,
+because VS Code has no table view and a webview is not worth it for columns — the columns became the description
+and the tooltip. Recorded in `extension-design.md`, not left as an oversight.
 
 ## Phase 5 — feedback and health
 
