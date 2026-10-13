@@ -16,6 +16,7 @@
 | `src/ai/citations.ts` | what an answer pointed at: the ids that resolve, the ids that do not, and the plain term search behind a low-confidence fallback |
 | `src/ai/panel.ts` | the `Temco Knowledge` panel: chat about the open page, `Draft update` as a diff, `Ask the area`, and the model line. Decides nothing itself |
 | `src/ai/commands.ts` | the list a person picks from: install, use, remove, open the folder, and the AI's status |
+| `src/builds.ts` | the product repo's own builds, invoked as VS Code tasks and judged by the artifact they leave — never by an exit code, and never the form that deploys |
 
 `registry.ts` is deliberately free of presentation: it is the part that would survive replacing the view, and
 the part an AI feature will reuse to know what pages exist.
@@ -81,6 +82,8 @@ Temco Knowledge                                     (panel: the AI, bottom area)
 | `temcoKnowledge.removeModel` | deletes an installed runtime or model, and clears it from the settings when it was the one in use |
 | `temcoKnowledge.openModelFolder` | opens the folder the downloads live in |
 | `temcoKnowledge.aiStatus` | which runtime and model are in use, whether the server is running, and how to stop it or read its log |
+| `temcoKnowledge.buildSite` | invokes the repository's own `docs:site` as a task and reports the files it produced |
+| `temcoKnowledge.buildHelp` | invokes the non-deploying help build (`build:help:dry`) and reports the CHM it produced |
 
 ## What refreshes the view
 
@@ -108,6 +111,9 @@ names.
   follows the same rule — an explicit command, and a token in secret storage.
 - **Nothing native ships.** A compiled engine is per-OS; a downloaded one is not, which is what keeps one
   `.vsix` valid on every platform — our application, plain VS Code, Windows or macOS.
+- **Building is not shipping.** The build commands invoke the repository's own scripts and report what those
+  scripts produced. The form that deploys into a T3000 installation is never run, and nothing is uploaded or
+  committed.
 - **A process, only while it is wanted.** The local server starts when something asks the AI for an answer,
   never at activation; it listens on loopback only; and it is stopped when idle, when its model is removed,
   and when the window closes. The extension holds no model in its own process, so nothing to load or unload

@@ -91,6 +91,16 @@
         "command": "temcoKnowledge.aiStatus",
         "title": "AI Status",
         "icon": "$(pulse)"
+      },
+      {
+        "command": "temcoKnowledge.buildSite",
+        "title": "Build the Site",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "temcoKnowledge.buildHelp",
+        "title": "Build the Offline Help",
+        "icon": "$(book)"
       }
     ],
     "menus": {

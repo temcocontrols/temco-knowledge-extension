@@ -41,6 +41,11 @@
   is refused instead of half-drafted, a missing prompt file is a named error, and the panel's model line carries
   the prompt version. `extension-design.md` now maps every guardrail from `12-ai-features.md` §5 to the place
   that enforces it.
+- **Publishing, invoked rather than reimplemented.** *Build the Site* and *Build the Offline Help* run the open
+  repository's own scripts as VS Code tasks — `docs:site`, and only ever the non-deploying `build:help:dry` — and
+  then report the artifacts as path, size and time. Success is a file that did not exist before and does now,
+  because the CHM build's exit code cannot be trusted. The deploying help build is refused with a reason rather
+  than run, since it copies the CHM into a T3000 installation.
 
 ## 0.0.1
 

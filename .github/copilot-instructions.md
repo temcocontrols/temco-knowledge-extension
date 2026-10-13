@@ -36,8 +36,9 @@ belong to the **product** repository, which keeps the content and the publishing
 2. **Read-only by default.** The only write allowed without an explicit user command is creating the empty
    file for a page that the registry already declares. Never edit `registry.json`, and never commit on the
    user's behalf.
-3. **Never publish.** Building and shipping artifacts happens through commands in the product repo. This
-   extension may invoke them, never reimplement them.
+3. **Never publish.** This extension invokes the product repo's own build scripts — `docs:site`, and the
+   non-deploying `build:help:dry` — and reports the artifacts they leave behind. It never runs the form that
+   deploys into a T3000 installation, and it never reimplements the pipeline.
 4. **Nothing native ships, and downloads are asked for.** A compiled inference engine is per-OS, so the
    runtime and the models are downloaded on request into the user's own folder — never bundled, never written
    into a repository, always a command the user ran. The runtime is a normal program run as a child process,
@@ -55,6 +56,7 @@ src/registry.ts      reads docs/help/registry.json + the generated index.json/pa
 src/tree.ts          the Content view (areas, chapters, pages, Gaps, issue children, provenance in tooltips)
 src/diagnostics.ts   turns issues into Problems, in the file that has to be fixed
 src/extension.ts     activation: view, status bar, commands, file watcher
+src/builds.ts        invokes the product repo's own build scripts (never the deploying one)
 src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack),
                      runtime.ts (the local server process), prompts.ts (the versioned instructions),
                      history.ts (the commit range), citations.ts (what an answer pointed at),

@@ -8,6 +8,7 @@ import * as vscode from 'vscode';
 import { registerAiCommands } from './ai/commands';
 import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
+import { registerBuildCommands } from './builds';
 import { publishDiagnostics } from './diagnostics';
 import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
 import { KnowledgeNode, KnowledgeTreeProvider, pageFromNode } from './tree';
@@ -179,6 +180,7 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   registerAiCommands(context);
+  registerBuildCommands(context, () => roots, output);
 
   void refresh();
 }

@@ -102,13 +102,26 @@ file host: **pin the model checksums and sizes** (they ship as `sha256: ''`, whi
 chooses to download, so the rule about asking before adding a dependency is met by asking for the download
 instead — and the extension still installs into an ordinary editor on any OS.
 
-## Phase 3 — publishing · next
+## Phase 3 — publishing · done
 
-| # | Step | Done when |
-|---|---|---|
-| 3.1 | Invoke the product repository's **site build** as a task, streaming its output | the site build runs from here and its output is visible; no build logic is reimplemented |
-| 3.2 | Invoke the **offline help build**; judge success by the artifact, never the exit code | the produced file exists, is newer than the run, and its path is reported |
-| 3.3 | Report the artifacts — path, size, timestamp — and hand them over | nothing is uploaded, committed or published by this extension |
+| # | Step | Done when | State |
+|---|---|---|---|
+| 3.1 | Invoke the product repository's **site build** as a task, streaming its output | the site build runs from here and its output is visible; no build logic is reimplemented | **done** 2026-10-13 |
+| 3.2 | Invoke the **offline help build**; judge success by the artifact, never the exit code | the produced file exists, is newer than the run, and its path is reported | **done** 2026-10-13 |
+| 3.3 | Report the artifacts — path, size, timestamp — and hand them over | nothing is uploaded, committed or published by this extension | **done** 2026-10-13 |
+
+**Invoked, never reimplemented — and never a deploy.** `src/builds.ts` reads the repository's own `package.json`,
+so the script is the repository's declared interface: it runs `docs:site` as a VS Code task (visible in the
+terminal, cancellable) and `build:help:dry` for the help. Only `build:help:dry` is ever invoked — the plain
+`build:help` copies the CHM into a T3000 installation, and building is not shipping. If a repository has only
+the deploying form, the command refuses and says why instead of running it. Success is decided by a **file that
+did not exist before and does now** — the CHM build's exit code has never been trustworthy — and the report
+lists path, size and time for each artifact.
+
+Worth knowing, because it is the reason this is a deliberate command rather than a button: the help build
+inherently writes into the product layout (`T3000_Building_Automation_System\HelpDocs\T3000_Help.chm`), which
+is a different repository again; the search for the artifact looks there by the folder's *name*, never by hard
+typing another repository's path.
 
 ## Phase 4 — the dashboard
 
@@ -137,3 +150,5 @@ instead — and the extension still installs into an ordinary editor on any OS.
 | Pin the model checksums and sizes | 2.2's follow-up; needs a machine that can reach the file host | the repository owner |
 | May this extension ever write into a product repository beyond a declared-but-missing page file? | 4.5 | the repository owner |
 | The GitHub token: a new PAT, or the one the `gh` CLI already holds | 4.2 | the repository owner |
+| May the extension invoke a product repository's build scripts? | **resolved 2026-10-13** — yes, as VS Code tasks discovered from that repository's own `package.json`; never reimplemented | — |
+| Does it ever deploy the CHM into a T3000 installation? | **resolved 2026-10-13** — never: only the non-deploying `build:help:dry` is invoked, and shipping stays a separate act | — |
