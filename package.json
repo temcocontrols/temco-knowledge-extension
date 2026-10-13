@@ -63,6 +63,21 @@
         "command": "temcoKnowledge.revealPage",
         "title": "Reveal in Explorer",
         "icon": "$(folder-opened)"
+      },
+      {
+        "command": "temcoKnowledge.models",
+        "title": "Models and Runtime",
+        "icon": "$(server-process)"
+      },
+      {
+        "command": "temcoKnowledge.removeModel",
+        "title": "Remove Model or Runtime",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "temcoKnowledge.openModelFolder",
+        "title": "Open Model Folder",
+        "icon": "$(file-directory)"
       }
     ],
     "menus": {
@@ -81,6 +96,11 @@
           "command": "temcoKnowledge.refresh",
           "when": "view == temcoKnowledge.pages",
           "group": "navigation@3"
+        },
+        {
+          "command": "temcoKnowledge.models",
+          "when": "view == temcoKnowledge.pages",
+          "group": "navigation@4"
         }
       ],
       "view/item/context": [
@@ -100,6 +120,31 @@
           "group": "1_open@2"
         }
       ]
+    },
+    "configuration": {
+      "title": "Temco Knowledge",
+      "properties": {
+        "temcoKnowledge.ai.modelFolder": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Where the local runtime and its models are downloaded. Empty keeps them in the extension's own storage — never in a repository."
+        },
+        "temcoKnowledge.ai.allowUnpinned": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Allow downloading a catalog entry whose checksum is not pinned yet. Each such download asks for confirmation first, and the checksum it turns out to have is recorded, so a later change is still noticed."
+        },
+        "temcoKnowledge.ai.runtime": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Id of the local runtime in use. Chosen from **Temco Knowledge: Models and Runtime**."
+        },
+        "temcoKnowledge.ai.model": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Id of the model in use. Chosen from **Temco Knowledge: Models and Runtime**."
+        }
+      }
     }
   },
   "scripts": {

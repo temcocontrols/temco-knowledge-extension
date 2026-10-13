@@ -12,7 +12,13 @@
   (the 16 design documents, its README and its TOC). The product repository no longer registers or publishes
   them, so its **Contributing** area is gone from the published site: its area definition, its 17 registry
   entries, the `design/**` content glob, the navbar node and the generator that produced them were removed.
-- As of this entry the work above is in the working tree and uncommitted.
+- The tree and the report show what the generator knows: a page's last change and headings in its tooltip, a
+  `stale` marker on the page when the generator says its code moved on, and a stale count on the repository and
+  area tooltips. Read from `docs/help/index.json` / `page-meta.json`; absent, everything else works unchanged.
+- **The local AI's first slice: the model list.** *Models and Runtime* offers the llama.cpp build for this
+  machine and a choice of models, downloads the one picked into the user's own folder (resumable, checked
+  against the catalog's sha256), unpacks it with the platform's `tar`, records it in a manifest, and can remove
+  it again. Nothing native ships with the extension, and every download is a command the user ran.
 
 ## 0.0.1
 

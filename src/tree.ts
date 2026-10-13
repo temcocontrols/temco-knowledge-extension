@@ -5,7 +5,16 @@
 // needs attention", not "show me page 217". A page with a problem gets its reasons as children.
 
 import * as vscode from 'vscode';
-import { AreaGroup, ChapterGroup, DocsRoot, PageEntry, collectPages, totals } from './registry';
+import {
+  AreaGroup,
+  ChapterGroup,
+  DocsRoot,
+  PageEntry,
+  Provenance,
+  collectPages,
+  countStale,
+  totals,
+} from './registry';
 
 class FolderNode {
   readonly kind = 'folder';
@@ -145,8 +154,14 @@ function folderItem(node: FolderNode): vscode.TreeItem {
     node.root.areas.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None
   );
   item.description = `${node.root.pages} pages`;
+  const stale = countStale(collectPages(node.root));
   item.tooltip = new vscode.MarkdownString(
-    `**${node.root.folder.name}**\n\n${node.root.pages} pages · ${node.root.issues} issues · ${node.root.neverReviewed} never reviewed`
+    [
+      `**${node.root.folder.name}**`,
+      '',
+      `${node.root.pages} pages · ${node.root.issues} issues · ${node.root.neverReviewed} never reviewed` +
+        (stale > 0 ? ` · ${stale} stale` : ''),
+    ].join('\n')
   );
   item.iconPath = new vscode.ThemeIcon('library');
   item.contextValue = 'folder';
@@ -160,12 +175,14 @@ function areaItem(node: AreaNode): vscode.TreeItem {
     area.chapters.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
   );
   item.description = `${area.pages} pages${describeIssues(area)}`;
+  const stale = countStale(node.area.chapters.flatMap((chapter) => chapter.pages));
   item.tooltip = new vscode.MarkdownString(
     [
       `**${area.title}**`,
       '',
       `audience: ${area.audience}${area.noindex ? ' · excluded from the published site' : ''}`,
-      `${area.pages} pages · ${area.neverReviewed} never reviewed${area.unshipped ? ` · ${area.unshipped} not shipped` : ''}`,
+      `${area.pages} pages · ${area.neverReviewed} never reviewed${area.unshipped ? ` · ${area.unshipped} not shipped` : ''}` +
+        (stale > 0 ? ` · ${stale} stale` : ''),
     ].join('\n')
   );
   item.iconPath = new vscode.ThemeIcon('book');
@@ -188,12 +205,13 @@ function chapterItem(node: ChapterNode): vscode.TreeItem {
 
 function pageItem(node: PageNode): vscode.TreeItem {
   const { page } = node;
+  const stale = page.provenance?.stale === true;
   const item = new vscode.TreeItem(
     page.title,
     page.issues.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
   );
   item.id = `${node.root.folder.name}:${page.id}`;
-  item.description = `${page.owner}${page.ship ? '' : ' · not shipped'}${page.reviewed ? '' : ' · never reviewed'}`;
+  item.description = `${stale ? 'stale · ' : ''}${page.owner}${page.ship ? '' : ' · not shipped'}${page.reviewed ? '' : ' · never reviewed'}`;
   item.tooltip = new vscode.MarkdownString(
     [
       `**${page.title}**`,
@@ -201,15 +219,20 @@ function pageItem(node: PageNode): vscode.TreeItem {
       `id: \`${page.id}\``,
       `owner: ${page.owner || '—'} · audience: ${page.audience}`,
       `ship: ${page.ship ? 'yes' : 'no'} · reviewed: ${page.reviewed ?? 'never'}`,
+      ...provenanceLines(page.provenance),
       '',
       page.issues.length === 0
         ? '_No structural problem._'
         : page.issues.map((issue) => `- ${issue.severity === 'error' ? '$(error)' : '$(warning)'} ${issue.message}`).join('\n'),
     ].join('\n')
   );
-  item.iconPath = page.exists
-    ? new vscode.ThemeIcon(page.issues.length > 0 ? 'warning' : 'file', page.issues.length > 0 ? new vscode.ThemeColor('problemsWarningIcon.foreground') : undefined)
-    : new vscode.ThemeIcon('question', new vscode.ThemeColor('problemsErrorIcon.foreground'));
+  item.iconPath = !page.exists
+    ? new vscode.ThemeIcon('question', new vscode.ThemeColor('problemsErrorIcon.foreground'))
+    : page.issues.length > 0
+      ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground'))
+      : stale
+        ? new vscode.ThemeIcon('history', new vscode.ThemeColor('descriptionForeground'))
+        : new vscode.ThemeIcon('file');
   item.contextValue = 'page';
   item.command = {
     command: 'temcoKnowledge.openPage',
@@ -217,6 +240,31 @@ function pageItem(node: PageNode): vscode.TreeItem {
     arguments: [node],
   };
   return item;
+}
+
+/** The lines a page tooltip adds once the generator's provenance is known — none when it is not. */
+function provenanceLines(provenance: Provenance | undefined): string[] {
+  if (!provenance) {
+    return [];
+  }
+  const lines: string[] = [];
+  const changed = provenance.updated ?? provenance.git?.date;
+  if (changed) {
+    const by = provenance.git?.author ? ` by ${provenance.git.author}` : '';
+    const sha = provenance.git?.sha ? ` (${provenance.git.sha})` : '';
+    lines.push(`last change: ${changed}${by}${sha}`);
+  } else if (provenance.git?.sha) {
+    lines.push(`last change: ${provenance.git.sha}`);
+  }
+  if (provenance.stale) {
+    lines.push('**stale**: a commit touched code this page claims, after its last review');
+  }
+  const shown = provenance.headings.slice(0, 8);
+  if (shown.length > 0) {
+    const more = provenance.headings.length - shown.length;
+    lines.push(`headings: ${shown.join(' · ')}${more > 0 ? ` · +${more} more` : ''}`);
+  }
+  return lines;
 }
 
 function issueItem(node: IssueNode): vscode.TreeItem {

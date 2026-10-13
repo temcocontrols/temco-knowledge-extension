@@ -24,7 +24,7 @@ export function publishDiagnostics(collection: vscode.DiagnosticCollection, root
 
   for (const root of roots) {
     for (const problem of root.problems) {
-      add(root.registryUri, problem.message, problem.severity);
+      add(problem.uri ?? root.registryUri, problem.message, problem.severity);
     }
     for (const page of collectPages(root)) {
       for (const issue of page.issues) {

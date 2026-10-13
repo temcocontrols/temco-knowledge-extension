@@ -5,8 +5,9 @@
 // without an explicit command, and nothing is published from here at all.
 
 import * as vscode from 'vscode';
+import { registerModelCommands } from './ai/commands';
 import { publishDiagnostics } from './diagnostics';
-import { DocsRoot, RegistryError, collectPages, loadDocsRoot, registryUriFor, totals } from './registry';
+import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
 import { KnowledgeNode, KnowledgeTreeProvider, pageFromNode } from './tree';
 
 const OUTPUT_NAME = 'Temco Knowledge';
@@ -69,9 +70,10 @@ export function activate(context: vscode.ExtensionContext): void {
     output.appendLine(`Repositories with a registry: ${roots.length}`);
 
     for (const root of roots) {
+      const stale = countStale(collectPages(root));
       output.appendLine(
         `  ${root.folder.name}: ${root.pages} pages · ${root.errors} errors · ${root.warnings} warnings · ` +
-          `${root.neverReviewed} never reviewed · ${root.unshipped} not shipped`
+          `${root.neverReviewed} never reviewed · ${root.unshipped} not shipped${stale > 0 ? ` · ${stale} stale` : ''}`
       );
       for (const problem of root.problems) {
         output.appendLine(`    ${problem.severity}: ${problem.message}`);
@@ -147,14 +149,24 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.workspace.onDidChangeWorkspaceFolders(() => void refresh())
   );
 
-  // The registry is the one file whose edits change the shape of the tree, so it is the one watched.
-  const watcher = vscode.workspace.createFileSystemWatcher('**/docs/help/registry.json');
-  context.subscriptions.push(
-    watcher,
-    watcher.onDidChange(() => void refresh()),
-    watcher.onDidCreate(() => void refresh()),
-    watcher.onDidDelete(() => void refresh())
-  );
+  // Three files change what the view shows: the registry — the shape of the tree — and the two generated
+  // neighbours, which carry the provenance and headings the items display. Everything else, including
+  // saving a page, does not refresh: the tree describes structure, not prose.
+  for (const pattern of [
+    '**/docs/help/registry.json',
+    '**/docs/help/index.json',
+    '**/docs/help/page-meta.json',
+  ]) {
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+    context.subscriptions.push(
+      watcher,
+      watcher.onDidChange(() => void refresh()),
+      watcher.onDidCreate(() => void refresh()),
+      watcher.onDidDelete(() => void refresh())
+    );
+  }
+
+  registerModelCommands(context);
 
   void refresh();
 }

@@ -12,6 +12,10 @@ export const REGISTRY_RELATIVE_PATH = ['docs', 'help', 'registry.json'];
 /** Folder that holds the pages themselves, relative to the repository root. */
 const CONTENT_RELATIVE_PATH = ['docs'];
 
+/** The generated neighbours the product repo's generator writes beside the registry. */
+const INDEX_RELATIVE_PATH = ['docs', 'help', 'index.json'];
+const PAGE_META_RELATIVE_PATH = ['docs', 'help', 'page-meta.json'];
+
 export interface RegistryArea {
   title?: string;
   audience?: string;
@@ -47,6 +51,32 @@ export interface Issue {
   message: string;
 }
 
+/** A problem that belongs to a whole file; `registry.json` unless the generator's file is at fault. */
+export interface RootProblem extends Issue {
+  uri?: vscode.Uri;
+}
+
+/** The last commit that touched a page, as the generator recorded it. */
+export interface GitInfo {
+  author?: string;
+  sha?: string;
+  date?: string;
+}
+
+/**
+ * What the generator knows about a page and the registry does not: when it last changed, the headings it
+ * carries, and whether its `code` moved on since the page was last reviewed.
+ *
+ * `stale` is the product repo's verdict, computed there from the page's `code` globs. It is read, never
+ * recomputed here — a second answer to that question would be worse than no answer.
+ */
+export interface Provenance {
+  git: GitInfo | null;
+  updated: string | null;
+  stale: boolean;
+  headings: string[];
+}
+
 export interface PageEntry {
   /** Registry key, which is also the page path under `docs/`, without the extension. */
   id: string;
@@ -61,6 +91,8 @@ export interface PageEntry {
   uri: vscode.Uri;
   exists: boolean;
   issues: Issue[];
+  /** What the generator knows about this page; undefined when neither neighbour file could be read. */
+  provenance?: Provenance;
 }
 
 export interface ChapterGroup {
@@ -90,8 +122,8 @@ export interface DocsRoot extends Counts {
   rootUri: vscode.Uri;
   registryUri: vscode.Uri;
   areas: AreaGroup[];
-  /** Problems with the file as a whole, so they are reported on `registry.json` itself. */
-  problems: Issue[];
+  /** Problems that belong to one whole file — `registry.json` unless the generator's file is at fault. */
+  problems: RootProblem[];
 }
 
 /** Thrown when the registry cannot be read at all, so the caller can show one clear message. */
@@ -160,7 +192,7 @@ export async function loadDocsRoot(folder: vscode.WorkspaceFolder): Promise<Docs
 
   const declaredAreas = registry.areas ?? {};
   const declaredPages = registry.pages ?? {};
-  const problems: Issue[] = [];
+  const problems: RootProblem[] = [];
   const ids = Object.keys(declaredPages);
 
   if (ids.length === 0) {
@@ -253,6 +285,15 @@ export async function loadDocsRoot(folder: vscode.WorkspaceFolder): Promise<Docs
     }
   }
 
+  // The generated neighbours are optional: without them every check above still runs on its own, only the
+  // provenance the items display goes missing.
+  for (const [id, provenance] of await loadProvenance(folder.uri, problems)) {
+    const entry = entries.get(id);
+    if (entry) {
+      entry.provenance = provenance;
+    }
+  }
+
   const areas = groupAreas(declaredAreas, entries);
   return { folder, rootUri: folder.uri, registryUri, areas, problems, ...sumCounts(entries) };
 }
@@ -313,6 +354,104 @@ function append(map: Map<string, string[]>, key: string, value: string): void {
   const values = map.get(key) ?? [];
   values.push(value);
   map.set(key, values);
+}
+
+/**
+ * Counts the pages the generator marked stale: commits touched the code they claim, after the last review.
+ * Reported as a count, never as a problem — staleness is the product repo's own gate, not a fault here.
+ */
+export function countStale(pages: readonly PageEntry[]): number {
+  return pages.filter((page) => page.provenance?.stale === true).length;
+}
+
+/** `docs/help/index.json` as the generator writes it — only the parts read here. */
+interface IndexJson {
+  pages?: {
+    id?: string;
+    git?: GitInfo | null;
+    stale?: boolean;
+    headings?: unknown[];
+  }[];
+}
+
+/** One page's row in `docs/help/page-meta.json`. */
+interface PageMetaEntry {
+  updated?: string | null;
+  sha?: string | null;
+  stale?: boolean;
+}
+
+/**
+ * Reads the two generated neighbours, page id by page id.
+ *
+ * `index.json` is the richer file: headings, the last commit and the stale verdict. `page-meta.json` is the
+ * small one the published page reads, and it can stand in for provenance when `index.json` is not there.
+ * Neither is required — a repository that has never run the generator simply has no provenance to show.
+ */
+async function loadProvenance(rootUri: vscode.Uri, problems: RootProblem[]): Promise<Map<string, Provenance>> {
+  const byId = new Map<string, Provenance>();
+  const entryFor = (id: string): Provenance => {
+    const existing = byId.get(id);
+    if (existing) {
+      return existing;
+    }
+    const created: Provenance = { git: null, updated: null, stale: false, headings: [] };
+    byId.set(id, created);
+    return created;
+  };
+
+  const index = await readNeighbour<IndexJson>(vscode.Uri.joinPath(rootUri, ...INDEX_RELATIVE_PATH), problems);
+  for (const page of index?.pages ?? []) {
+    if (!page.id) {
+      continue;
+    }
+    const entry = entryFor(page.id);
+    entry.git = page.git ?? null;
+    entry.updated = page.git?.date ?? null;
+    entry.stale = page.stale === true;
+    entry.headings = (page.headings ?? []).map(String).filter((heading) => heading.length > 0);
+  }
+
+  const meta = await readNeighbour<Record<string, PageMetaEntry | undefined>>(
+    vscode.Uri.joinPath(rootUri, ...PAGE_META_RELATIVE_PATH),
+    problems
+  );
+  for (const [id, page] of Object.entries(meta ?? {})) {
+    if (!page) {
+      continue;
+    }
+    const entry = entryFor(id);
+    entry.updated = entry.updated ?? page.updated ?? null;
+    entry.git = entry.git ?? (page.sha ? { sha: page.sha } : null);
+    entry.stale = entry.stale || page.stale === true;
+  }
+
+  return byId;
+}
+
+/**
+ * Reads one generated neighbour.
+ *
+ * Absent is a normal state, not a problem. Unreadable is a warning **on that file**, because the fix is to
+ * regenerate it in the product repo — and it never becomes an error, since it hides nothing else.
+ */
+async function readNeighbour<T>(uri: vscode.Uri, problems: RootProblem[]): Promise<T | undefined> {
+  if (!(await fileExists(uri))) {
+    return undefined;
+  }
+  try {
+    const bytes = await vscode.workspace.fs.readFile(uri);
+    return JSON.parse(Buffer.from(bytes).toString('utf8')) as T;
+  } catch (error) {
+    problems.push({
+      severity: 'warning',
+      message:
+        `${vscode.workspace.asRelativePath(uri)} could not be read (${describe(error)}). ` +
+        'Regenerating the documentation files fixes it; everything except provenance still works.',
+      uri,
+    });
+    return undefined;
+  }
 }
 
 function describe(error: unknown): string {
