@@ -116,24 +116,95 @@ class SectionView implements vscode.TreeDataProvider<Row> {
     return rows;
   }
 
-  /** What it reads, and what it produces — as counts, because neither is collected yet. */
+  /**
+   * What a person creates, then what it is made of.
+   *
+   * Documents come first because they are the unit of management — a source is only something a document cites.
+   * Before anything is created the section is a sentence, not a button.
+   */
   private async library(): Promise<Row[]> {
-    const counts = await this.catalogCounts();
-    return [
-      new Row('Sources', counts.sources === 0 ? 'none recorded yet' : String(counts.sources), 'repo'),
-      new Row(
-        'Documents',
-        counts.documents === 0 ? 'none created yet' : String(counts.documents),
-        'book'
-      ),
-      new Row(
-        'Catalog',
-        counts.tables === 0
-          ? 'not opened yet'
-          : `${counts.tables} tables · schema ${counts.schema} · on this machine`,
-        'database'
-      ),
-    ];
+    let rows: Row[] = [];
+    let catalog: Catalog | undefined;
+    try {
+      catalog = await Catalog.open(this.context);
+      const documents = catalog.documents();
+      const sources = catalog.sources();
+
+      const documentRows = documents.map((document) => {
+        const slug = document.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        const cited = catalog !== undefined ? catalog.documentSources(slug) : [];
+        const artifacts = catalog !== undefined ? catalog.documentArtifacts(slug) : [];
+
+        const children: Row[] = [
+          new Row(
+            'Sources',
+            cited.length === 0 ? 'none yet' : String(cited.length),
+            'repo',
+            cited.map(
+              (source) =>
+                new Row(
+                  source.name,
+                  [source.kind, source.branch].filter((part): part is string => Boolean(part)).join(' · '),
+                  'git-branch'
+                )
+            )
+          ),
+          new Row(
+            'Outputs',
+            artifacts.length === 0 ? 'never built' : `${artifacts.length} built`,
+            'package',
+            artifacts.map(
+              (artifact) => new Row(artifact.path, artifact.builtAt.slice(0, 10), 'file')
+            )
+          ),
+        ];
+
+        return new Row(
+          document.name,
+          [
+            document.version ? `v${document.version}` : undefined,
+            `${document.sources} source${document.sources === 1 ? '' : 's'}`,
+            document.builtAt ? 'built' : 'never built',
+          ]
+            .filter((part): part is string => Boolean(part))
+            .join(' · '),
+          'book',
+          children
+        );
+      });
+
+      rows = [
+        new Row('Documents', documents.length === 0 ? 'none created yet' : String(documents.length), 'library', documentRows),
+        new Row(
+          'Sources',
+          sources.length === 0 ? 'none recorded yet' : String(sources.length),
+          'repo',
+          sources.map(
+            (source) =>
+              new Row(
+                source.name,
+                [source.kind, source.branch, source.lastReadMode].
+                  filter((part): part is string => Boolean(part))
+                  .join(' · '),
+                source.kind === 'git' ? 'git-branch' : 'file'
+              )
+          )
+        ),
+        new Row(
+          'Catalog',
+          `${catalog.counts().length} tables · schema ${catalog.schemaVersion()} · on this machine`,
+          'database'
+        ),
+      ];
+    } catch {
+      rows = [new Row('Catalog', 'not opened yet', 'database')];
+    } finally {
+      catalog?.close();
+    }
+    return rows;
   }
 
   private async unseen(): Promise<number> {
@@ -148,28 +219,6 @@ class SectionView implements vscode.TreeDataProvider<Row> {
     }
   }
 
-  private async catalogCounts(): Promise<{
-    sources: number;
-    documents: number;
-    tables: number;
-    schema: number;
-  }> {
-    let catalog: Catalog | undefined;
-    try {
-      catalog = await Catalog.open(this.context);
-      const counts = catalog.counts();
-      return {
-        sources: counts.find(([table]) => table === 'sources')?.[1] ?? 0,
-        documents: counts.find(([table]) => table === 'documents')?.[1] ?? 0,
-        tables: counts.length,
-        schema: catalog.schemaVersion(),
-      };
-    } catch {
-      return { sources: 0, documents: 0, tables: 0, schema: 0 };
-    } finally {
-      catalog?.close();
-    }
-  }
 }
 
 export function registerSectionViews(

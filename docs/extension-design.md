@@ -19,6 +19,9 @@
 | `src/builds.ts` | the product repo's own builds, invoked as VS Code tasks and judged by the artifact they leave — never by an exit code, and never the form that deploys |
 | `src/report.ts` | the staleness report: what needs attention, grouped by owner, as Markdown. Counts rather than lists for the pages that have merely never been reviewed |
 | `src/scaffold.ts` | starting a registry in an open folder that has none: the smallest valid file, on a confirmation, with the seeding left to the repository's own generator |
+| `src/home.ts` | the dashboard: the one page that is not about a folder — identity, how the application works, what we have now, how to start, and every feature with its state |
+| `src/views.ts` | the other two sidebar sections: **Work** (what needs doing, and what changed) and **Library** (what it reads and produces) |
+| `src/catalog/` | `schema.ts` (the tables) · `store.ts` (`node:sqlite`, in the extension's own storage — never in a repository) · `commands.ts` (the catalog status) |
 | `src/feedback.ts` | feedback rows routed to their page's owner, against a proposed file shape, with the aging called out |
 
 `registry.ts` is deliberately free of presentation: it is the part that would survive replacing the view, and

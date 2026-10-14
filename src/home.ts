@@ -1,8 +1,7 @@
 // The dashboard — the application's own window.
 //
 //   TOP    identity, and how the application works, in four steps
-//   MAIN   one scrolling column: what we have now, how to start now, what the application can do, and what is
-//          planned
+//   MAIN   one scrolling column: what we have now, how to start now, and what the application can do
 //
 // A single column, because the rail proved to be a second place to look for the same facts. Nothing here is
 // specific to a product: the documents and sources come from the catalog, the folders from what is open, and
@@ -16,7 +15,7 @@ export const HOME_VIEW_TYPE = 'temcoKnowledge.home';
 
 interface Feature {
   name: string;
-  state: 'working' | 'planned';
+  state: 'working';
   detail: string;
 }
 
@@ -53,28 +52,16 @@ const FEATURES: Feature[] = [
       'The application’s memory: one SQLite database on this machine for sources, documents, builds and what changed. Never in a repository, never committed.',
   },
   {
+    name: 'Projects',
+    state: 'working',
+    detail:
+      'Create a document — the project you manage and version — and give it sources: a repository at a branch you choose, a folder on this machine, or an archive.',
+  },
+  {
     name: 'Start a Registry',
     state: 'working',
     detail:
       'Creates the smallest valid registry in a folder you have open, on a confirmation, and leaves filling it to that project’s own generator.',
-  },
-  {
-    name: 'Sources',
-    state: 'planned',
-    detail:
-      'Add a repository at a branch you choose, a folder on this machine, or an archive — and one of three ways to read it, so a row says how much it can be trusted.',
-  },
-  {
-    name: 'Documents',
-    state: 'planned',
-    detail:
-      'Create and version a document: one help set, built into a CHM, a PDF or a site, citing whichever sources it is made of.',
-  },
-  {
-    name: 'AI over history',
-    state: 'planned',
-    detail:
-      'Summarise the commits since the last scan, find the pages they affect, draft the edits and list what is owed — a resumable job, and a person approves every draft.',
   },
 ];
 
@@ -167,14 +154,13 @@ export class HomePanel {
     const manifest = this.context.extension.packageJSON as { version?: string; publisher?: string };
 
     const working = FEATURES.filter((feature) => feature.state === 'working');
-    const planned = FEATURES.filter((feature) => feature.state === 'planned');
 
     const cards = (list: Feature[]): string =>
       `<div class="grid">${list
         .map(
           (feature) => `
-        <article class="card${feature.state === 'planned' ? ' soon' : ''}">
-          <h3>${feature.name}<span class="mark">${feature.state === 'working' ? '✓' : 'planned'}</span></h3>
+        <article class="card">
+          <h3>${feature.name}<span class="mark">✓</span></h3>
           <p>${feature.detail}</p>
         </article>`
         )
@@ -243,28 +229,27 @@ export class HomePanel {
         <section>
           <h2>How to start now <span class="count">nothing has to be built first</span></h2>
           <ol class="steps">
-            <li><b>See what exists</b> — <a href="https://github.com/${escapeHtml(
-              organisation
-            )}">github.com/${escapeHtml(organisation)}</a> lists every project. Documentation is kept next to
-                the code, in each project’s own <code>docs/</code> folder.</li>
-            <li><b>Open one of them here</b> — open that project as a folder in this editor. The
-                <i>Content</i> view reads its registry straight away, and <i>Documentation Owed</i> says what
-                needs attention.</li>
-            <li><b>No registry in it?</b> Run <i>Start a Registry</i>: it creates the smallest valid one, and the
-                project’s own generator fills it in.</li>
-            <li><b>Then the rest follows</b> — sources, documents and the AI over the history are the next steps,
-                each with its state in the lists below.</li>
+            <li><b>Create a project</b> —
+                <a href="command:temcoKnowledge.newDocument">Create a document</a>: name it, give it a version
+                and an owner. This is the button marked <code>+</code> on the <b>Library</b> title bar, and it
+                is in the command palette as <i>Create a Document</i>.</li>
+            <li><b>Give it a source</b> —
+                <a href="command:temcoKnowledge.addSource">Add a source</a>: a repository at a branch you
+                choose, a folder on this machine, or an archive. The <code>+</code> beside it on the same title
+                bar.</li>
+            <li><b>Read it, then build it</b> — the Library shows each project's sources and the artifact it
+                produced, and the two remaining steps — reading a source, and building the document — are what
+                turn a project into a CHM, a PDF or a site.</li>
           </ol>
+          <p class="quiet">Nothing has to exist first. A project can be created before its sources are settled:
+          the application records what it found and says what is still missing. Where the documentation lives is
+          <a href="https://github.com/${escapeHtml(organisation)}">github.com/${escapeHtml(organisation)}</a> —
+          next to the code, in each project's own <code>docs/</code> folder.</p>
         </section>
 
         <section>
-          <h2>What this application can do <span class="count">${working.length} working</span></h2>
+          <h2>What this application can do</h2>
           ${cards(working)}
-        </section>
-
-        <section>
-          <h2>Planned <span class="count">${planned.length} designed, not built</span></h2>
-          ${cards(planned)}
         </section>
       </main>`;
 
@@ -319,8 +304,6 @@ function shell(body: string): string {
     .card p { margin: .3em 0 0; color: var(--vscode-descriptionForeground); font-size: .95em; }
     .card .mark { float: right; font-weight: 400; font-size: .85em;
                   color: var(--vscode-descriptionForeground); }
-    .card.soon { border-style: dashed; }
-    .card.soon h3 { color: var(--vscode-descriptionForeground); }
 
     .facts { border-collapse: collapse; width: 100%; margin: .3em 0 .6em; }
     .facts th, .facts td { text-align: left; padding: .3em 1em .3em 0; font-weight: 400;

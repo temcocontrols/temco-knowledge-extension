@@ -148,6 +148,16 @@
         "command": "temcoKnowledge.catalog",
         "title": "The Catalog",
         "icon": "$(database)"
+      },
+      {
+        "command": "temcoKnowledge.newDocument",
+        "title": "Create a Document",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "temcoKnowledge.addSource",
+        "title": "Add a Source",
+        "icon": "$(add)"
       }
     ],
     "menus": {
@@ -175,7 +185,17 @@
         {
           "command": "temcoKnowledge.catalog",
           "when": "view == temcoKnowledge.library",
+          "group": "navigation@1"
+        },
+        {
+          "command": "temcoKnowledge.newDocument",
+          "when": "view == temcoKnowledge.library",
           "group": "navigation@0"
+        },
+        {
+          "command": "temcoKnowledge.addSource",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [

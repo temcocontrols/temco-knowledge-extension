@@ -12,7 +12,8 @@ import { registerBuildCommands } from './builds';
 import { registerCatalogCommands } from './catalog/commands';
 import { publishDiagnostics } from './diagnostics';
 import { registerFeedbackCommands } from './feedback';
-import { HomePanel } from './home';
+import { HOME_VIEW_TYPE, HomePanel } from './home';
+import { registerProjectCommands } from './project';
 import { registerReportCommands } from './report';
 import { registerScaffoldCommands } from './scaffold';
 import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
@@ -164,7 +165,13 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       const document = await vscode.workspace.openTextDocument(page.page.uri);
-      await vscode.window.showTextDocument(document, { preview: false });
+      // Beside the dashboard rather than in its place: a page must never look as if the dashboard swallowed it.
+      await vscode.window.showTextDocument(document, {
+        preview: false,
+        viewColumn: isWebviewActive(HOME_VIEW_TYPE)
+          ? vscode.ViewColumn.Beside
+          : vscode.ViewColumn.Active,
+      });
     }),
 
     vscode.commands.registerCommand('temcoKnowledge.revealPage', async (node?: KnowledgeNode) => {
@@ -200,6 +207,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerScaffoldCommands(context);
   registerFeedbackCommands(context, () => roots);
   registerCatalogCommands(context, output);
+  registerProjectCommands(context, output);
 
   // Opening the extension shows the platform's home page — it is the first thing a person should see. It can
   // be turned off, because it opens a tab, and a tab is not always wanted.
@@ -213,6 +221,12 @@ export function activate(context: vscode.ExtensionContext): void {
 export function deactivate(): void {
   // The local AI may have left a server process running; nothing else is holding anything open.
   disposeAi();
+}
+
+/** True when the tab in front is one of our own webview pages — the dashboard. */
+function isWebviewActive(viewType: string): boolean {
+  const active = vscode.window.tabGroups.activeTabGroup.activeTab;
+  return active?.input instanceof vscode.TabInputWebview && active.input.viewType === viewType;
 }
 
 /** A new page starts as a title and nothing else — the structure lives in the registry, not in front matter. */

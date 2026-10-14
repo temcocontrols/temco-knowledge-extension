@@ -152,9 +152,165 @@ export class Catalog {
     return Number(row?.n ?? 0);
   }
 
+  /**
+   * Remembers a source, or updates the one with the same slug.
+   *
+   * Keyed by slug rather than by URL so a folder, a fork and a clone of the same project stay one row when the
+   * caller says they are — R2's discovery decides that, and the catalog only records the decision.
+   */
+  addSource(source: SourceInput): number {
+    this.db
+      .prepare(
+        `INSERT INTO sources
+           (kind, name, slug, remote_url, path, default_branch, branch, docs_root, registry_path, added_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(slug) DO UPDATE SET
+           kind = excluded.kind, name = excluded.name, remote_url = excluded.remote_url, path = excluded.path,
+           default_branch = excluded.default_branch, branch = excluded.branch, docs_root = excluded.docs_root,
+           registry_path = excluded.registry_path`
+      )
+      .run(
+        source.kind,
+        source.name,
+        source.slug,
+        source.remoteUrl ?? null,
+        source.path ?? null,
+        source.defaultBranch ?? null,
+        source.branch ?? null,
+        source.docsRoot ?? null,
+        source.registryPath ?? null,
+        new Date().toISOString()
+      );
+
+    const row = this.db.prepare('SELECT id FROM sources WHERE slug = ?').get(source.slug) as
+      | { id?: unknown }
+      | undefined;
+    return Number(row?.id ?? 0);
+  }
+
+  /** Forgets a source and everything recorded under it — the scan rows go with it, by foreign key. */
+  removeSource(slug: string): void {
+    this.db.prepare('DELETE FROM sources WHERE slug = ?').run(slug);
+  }
+
+  /** Records what a read of a source found, so the next read can say what changed. */
+  recordScan(sourceId: number, mode: string, revision: string | undefined, counts: unknown): void {
+    this.db
+      .prepare('INSERT INTO scans (source_id, at, mode, revision, counts) VALUES (?, ?, ?, ?, ?)')
+      .run(sourceId, new Date().toISOString(), mode, revision ?? null, JSON.stringify(counts ?? {}));
+    this.db
+      .prepare('UPDATE sources SET last_read = ?, last_read_mode = ?, last_commit = ? WHERE id = ?')
+      .run(new Date().toISOString(), mode, revision ?? null, sourceId);
+  }
+
+  /** Creates a document — the project a person manages — and returns its id. */
+  createDocument(document: DocumentInput): number {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO documents (name, slug, version, audience, owner, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(slug) DO UPDATE SET
+           name = excluded.name, version = excluded.version, audience = excluded.audience,
+           owner = excluded.owner, updated_at = excluded.updated_at`
+      )
+      .run(
+        document.name,
+        document.slug,
+        document.version ?? null,
+        document.audience ?? null,
+        document.owner ?? null,
+        now,
+        now
+      );
+    return this.documentId(document.slug);
+  }
+
+  /** Attaches a source to a document — what it is built from, at which branch, in what role. */
+  attachSource(documentSlug: string, sourceSlug: string, role = 'primary'): void {
+    const document = this.documentId(documentSlug);
+    const source = this.db.prepare('SELECT id FROM sources WHERE slug = ?').get(sourceSlug) as
+      | { id?: unknown }
+      | undefined;
+    const sourceId = Number(source?.id ?? 0);
+    if (document === 0 || sourceId === 0) {
+      throw new Error(`cannot attach ${sourceSlug} to ${documentSlug}: one of the two is not recorded`);
+    }
+    this.db
+      .prepare(
+        `INSERT INTO doc_sources (document_id, source_id, role) VALUES (?, ?, ?)
+         ON CONFLICT(document_id, source_id) DO UPDATE SET role = excluded.role`
+      )
+      .run(document, sourceId, role);
+  }
+
+  /** What a document is made of: its sources, each with the branch it is read at. */
+  documentSources(documentSlug: string): { name: string; kind: string; branch?: string }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT s.name AS name, s.kind AS kind, COALESCE(ds.branch, s.branch) AS branch
+           FROM doc_sources ds
+           JOIN sources s ON s.id = ds.source_id
+           JOIN documents d ON d.id = ds.document_id
+          WHERE d.slug = ?
+          ORDER BY s.name`
+      )
+      .all(documentSlug) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      name: String(row.name ?? ''),
+      kind: String(row.kind ?? ''),
+      branch: row.branch === null || row.branch === undefined ? undefined : String(row.branch),
+    }));
+  }
+
+  /** What a document has produced, newest first — the artifacts, by file. */
+  documentArtifacts(documentSlug: string): { kind: string; path: string; builtAt: string }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT a.kind AS kind, a.path AS path, a.built_at AS builtAt
+           FROM artifacts a JOIN documents d ON d.id = a.document_id
+          WHERE d.slug = ? ORDER BY a.built_at DESC`
+      )
+      .all(documentSlug) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      kind: String(row.kind ?? ''),
+      path: String(row.path ?? ''),
+      builtAt: String(row.builtAt ?? ''),
+    }));
+  }
+
+  private documentId(slug: string): number {
+    const row = this.db.prepare('SELECT id FROM documents WHERE slug = ?').get(slug) as
+      | { id?: unknown }
+      | undefined;
+    return Number(row?.id ?? 0);
+  }
+
   close(): void {
     this.db.close();
   }
+}
+
+/** What `createDocument` needs. An empty slug is refused by the caller, not here. */
+export interface DocumentInput {
+  name: string;
+  slug: string;
+  version?: string;
+  audience?: string;
+  owner?: string;
+}
+
+/** What `addSource` needs. Everything optional is genuinely optional: a folder has no branch. */
+export interface SourceInput {
+  kind: 'git' | 'folder' | 'archive';
+  name: string;
+  slug: string;
+  remoteUrl?: string;
+  path?: string;
+  defaultBranch?: string;
+  branch?: string;
+  docsRoot?: string;
+  registryPath?: string;
 }
 
 /** A row of the Documents page. */
