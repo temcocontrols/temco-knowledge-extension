@@ -11,19 +11,23 @@
 // page only runs. Its output is the verdict — this page does not parse it, and says so.
 
 import * as vscode from 'vscode';
+import { OFFERED_SCRIPTS, scriptsIn } from './builds';
 import { DocsRoot, collectPages, countStale } from './registry';
 import { NEEDS_VIEW_TYPE, pageColumn } from './surface';
 
-/** What the last run of the repository's own `docs:owed` left behind — only ever a fact about the run. */
-interface OwedRun {
+/** What the last run of one of the repository's own scripts left behind. */
+interface ScriptRun {
   folder: string;
+  script: string;
   exit: number | undefined;
   at: string;
+  rewritten: string[];
 }
 
 interface NeedsMessage {
   type: 'ready' | 'action';
-  action?: 'open' | 'create' | 'owed' | 'report' | 'registry' | 'openProject';
+  action?: 'open' | 'create' | 'owed' | 'report' | 'registry' | 'openProject' | 'script';
+  script?: string;
   path?: string;
   id?: string;
   title?: string;
@@ -31,7 +35,8 @@ interface NeedsMessage {
 
 export class NeedsPage {
   private panel: vscode.WebviewPanel | undefined;
-  private owed: OwedRun | undefined;
+  /** The last run of each script, by id — this session only: a run is a thing that happened, not state. */
+  private readonly runs = new Map<string, ScriptRun>();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -97,9 +102,24 @@ export class NeedsPage {
       case 'openProject':
         await vscode.commands.executeCommand('temcoKnowledge.openProjects');
         return;
+      case 'script': {
+        const id = message.script ?? '';
+        const result = await vscode.commands.executeCommand<ScriptRun | undefined>(
+          'temcoKnowledge.runScript',
+          id
+        );
+        if (result) {
+          this.runs.set(id, result);
+        }
+        await this.seed();
+        return;
+      }
       case 'owed': {
-        const result = await vscode.commands.executeCommand<OwedRun | undefined>('temcoKnowledge.runOwed');
-        this.owed = result;
+        // Kept for the old button: the same run, under the name the owed gate has everywhere else.
+        const result = await vscode.commands.executeCommand<ScriptRun | undefined>('temcoKnowledge.runOwed');
+        if (result) {
+          this.runs.set('docs:owed', result);
+        }
         await this.seed();
         return;
       }
@@ -112,6 +132,7 @@ export class NeedsPage {
     }
 
     const roots = this.roots();
+    const scriptsPresent = scriptsIn(roots);
     const sources: {
       name: string;
       origin: string;
@@ -188,8 +209,16 @@ export class NeedsPage {
       missing,
       stale,
       unowned,
-      owed: this.owed,
-      canRunOwed: sources.some((source) => source.owed),
+      // The scripts this repository actually has, each with what its last run in this session left behind.
+      scripts: OFFERED_SCRIPTS
+        .filter((script) => scriptsPresent.has(script.id))
+        .map((script) => ({
+          id: script.id,
+          label: script.label,
+          detail: script.detail,
+          run: this.runs.get(script.id),
+        })),
+      anyLocal: sources.some((source) => source.owed),
       totals: {
         faults: faults.length,
         errors: faults.filter((fault) => fault.severity === 'error').length,
@@ -264,7 +293,6 @@ function html(script: string): string {
   <h1>What needs doing</h1>
   <p class="meta" id="lede"></p>
   <div class="actions">
-    <button class="primary" id="owed">Run the owed check</button>
     <button id="report">Staleness report</button>
     <button id="registry">Open the registry</button>
     <button id="projects">The projects page</button>
@@ -279,8 +307,12 @@ function html(script: string): string {
   <div id="stale"></div>
   <h2>No owner <span class="n" id="unowned-n"></span></h2>
   <div id="unowned"></div>
-  <h2>Documentation owed</h2>
-  <div id="owedBox"></div>
+  <h2>The repository's own checks</h2>
+  <p class="meta">Each of these is the repository's own npm script, run as a task in the folder being read —
+    visible in the terminal, cancellable, and its output there is the verdict. This page says where a run
+    happened, when, and what it exited with; it never interprets one. A second opinion about what is owed, or
+    about what the media audit found, is the one thing a documentation platform must not invent.</p>
+  <div id="checks"></div>
 
   <p class="foot" id="foot"></p>
 
@@ -288,7 +320,6 @@ function html(script: string): string {
 const vscode = acquireVsCodeApi();
 const $ = (id) => document.getElementById(id);
 
-$('owed').addEventListener('click', () => vscode.postMessage({ type: 'action', action: 'owed' }));
 $('report').addEventListener('click', () => vscode.postMessage({ type: 'action', action: 'report' }));
 $('registry').addEventListener('click', () => vscode.postMessage({ type: 'action', action: 'registry' }));
 $('projects').addEventListener('click', () => vscode.postMessage({ type: 'action', action: 'openProject' }));
@@ -423,32 +454,37 @@ function render(data) {
         }))
   );
 
-  const owed = $('owedBox');
-  if (data.owed) {
-    const box = document.createElement('div');
-    box.className = 'verdict';
-    const p = document.createElement('p');
-    p.textContent =
-      'The repository\\'s own check ran in ' + data.owed.folder + ' at ' + data.owed.at +
-      ' and finished with exit code ' + (data.owed.exit === undefined ? 'none' : data.owed.exit) + '.';
-    const q = document.createElement('p');
-    q.className = 'meta';
-    q.textContent =
-      'What it decided is in its own output, in the terminal — this page does not interpret it, because a ' +
-      'second opinion about what is owed is the one thing a documentation platform must not invent.';
-    box.append(p, q);
-    owed.replaceChildren(box);
-  } else {
-    owed.replaceChildren(
-      data.canRunOwed
-        ? empty('Not checked in this session. The check is the repository’s own "npm run docs:owed", run from here — its output is the verdict.')
-        : empty('Nothing on this machine is being read, so there is no repository to check. Sources read over the API have no working tree to check in.')
+  // The repository's own checks, each with what its last run in this session left behind. A run is a fact:
+  // where, when, and the exit code. What the script *decided* is in its own output, in the terminal.
+  const checks = $('checks');
+  if (data.scripts.length === 0) {
+    checks.replaceChildren(
+      data.anyLocal
+        ? empty('The repository being read has none of these scripts. Nothing is offered that the repository does not have.')
+        : empty('Nothing on this machine is being read, so there is no repository to check. A source read over the API has no working tree to check in.')
     );
+  } else {
+    checks.replaceChildren(table(
+      ['Script', 'What it does', 'Last run in this session', ''],
+      data.scripts.map((script) => {
+        const run = script.run;
+        const last = run
+          ? 'in ' + run.folder + ' at ' + run.at + ' · exit ' + (run.exit === undefined ? 'none' : run.exit) +
+            (run.rewritten && run.rewritten.length > 0
+              ? ' · rewrote ' + run.rewritten.join(', ')
+              : '')
+          : 'not run yet';
+        return row([[script.label], [script.detail], [last]], {
+          label: 'Run',
+          done: () => vscode.postMessage({ type: 'action', action: 'script', script: script.id }),
+        });
+      })
+    ));
   }
 
   $('foot').textContent =
     'Every count on this page comes from a check that already exists somewhere else: the structural checks in ' +
-    'the registry reader, the generator\\'s stale verdict, and the repository\\'s own owed check. Nothing is ' +
+    'the registry reader, the generator’s stale verdict, and the repository’s own scripts. Nothing is ' +
     'computed twice here, and nothing is written except the empty file for a page that is declared and missing.';
 }
 

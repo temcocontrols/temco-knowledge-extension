@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 import { registerAiCommands } from './ai/commands';
 import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
-import { registerBuildCommands, runOwed } from './builds';
+import { registerBuildCommands, registerScriptCommands, runOwed } from './builds';
 import { Catalog } from './catalog/store';
 import { registerCatalogCommands } from './catalog/commands';
 import { publishDiagnostics } from './diagnostics';
@@ -259,6 +259,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   registerAiCommands(context);
   registerBuildCommands(context, () => roots, output);
+  // The repository's own maintenance scripts — the generator, the gates, the media audit, the owed check.
+  registerScriptCommands(context, () => roots, output, () => void refresh());
   registerReportCommands(context, () => roots);
   registerScaffoldCommands(context);
   registerFeedbackCommands(context, () => roots);

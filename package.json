@@ -175,8 +175,13 @@
         "icon": "$(checklist)"
       },
       {
+        "command": "temcoKnowledge.runScript",
+        "title": "Run One of the Repository's Documentation Scripts",
+        "icon": "$(run)"
+      },
+      {
         "command": "temcoKnowledge.runOwed",
-        "title": "Run the Repository's Docs-Owed Check",
+        "title": "Run the Docs-Owed Check",
         "icon": "$(law)"
       },
       {
@@ -274,6 +279,11 @@
           "command": "temcoKnowledge.openNeeds",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@2"
+        },
+        {
+          "command": "temcoKnowledge.runScript",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@11"
         },
         {
           "command": "temcoKnowledge.catalog",
@@ -389,7 +399,28 @@
         {
           "command": "temcoKnowledge.removeSource",
           "when": "view == temcoKnowledge.library && viewItem == source",
-          "group": "9_forget@1"        }
+          "group": "9_forget@1"
+        },
+        {
+          "command": "temcoKnowledge.aiPage",
+          "when": "view == temcoKnowledge.library && viewItem == ai",
+          "group": "1_open@1"
+        },
+        {
+          "command": "temcoKnowledge.aiStatus",
+          "when": "view == temcoKnowledge.library && viewItem == ai",
+          "group": "1_open@2"
+        },
+        {
+          "command": "temcoKnowledge.models",
+          "when": "view == temcoKnowledge.library && viewItem == ai",
+          "group": "1_open@3"
+        },
+        {
+          "command": "temcoKnowledge.openModelFolder",
+          "when": "view == temcoKnowledge.library && viewItem == ai",
+          "group": "1_open@4"
+        }
       ]
     },
     "viewsWelcome": [

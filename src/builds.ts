@@ -149,35 +149,211 @@ async function build(root: DocsRoot, output: vscode.OutputChannel, recipe: Recip
 export async function runOwed(
   roots: readonly DocsRoot[],
   output: vscode.OutputChannel
-): Promise<{ folder: string; exit: number | undefined; at: string } | undefined> {
+): Promise<ScriptRun | undefined> {
+  return await runScript(roots, output, 'docs:owed');
+}
+
+/**
+ * The repository's own maintenance scripts this application is willing to run.
+ *
+ * An allowlist rather than a parameter, because the caller on the other side of a webview must not be able to
+ * name *any* npm script: `build:help` deploys into a product installation, and `docs:clean` rewrites page prose
+ * rather than reporting on it. Invoking the generator is in a different class: it writes the files it exists to
+ * write, in its own format, and this application never reimplements any of it.
+ */
+export const OFFERED_SCRIPTS: readonly { id: string; label: string; detail: string }[] = [
+  {
+    id: 'docs:registry',
+    label: 'Regenerate the index',
+    detail: 'the generator: index.json · page-meta.json · the navbar · toc.yml · docfx.json · _admin',
+  },
+  {
+    id: 'docs:verify',
+    label: 'Run the gates',
+    detail: 'registry:check + the blocking audit + the media check — what a pull request has to pass',
+  },
+  {
+    id: 'docs:media:check',
+    label: 'The media audit',
+    detail: 'image names, reading order, size, duplicates, and files no page references',
+  },
+  {
+    id: 'docs:owed',
+    label: 'Documentation owed',
+    detail: 'the product repository own gate — a claimed feature changed and its page did not',
+  },
+];
+
+/** What one run of one script left behind. A run is a fact: where, when, which script, what it exited with. */
+export interface ScriptRun {
+  folder: string;
+  script: string;
+  exit: number | undefined;
+  at: string;
+  /** Files the generator rewrote, by name — only ever filled in for `docs:registry`, whose output is files. */
+  rewritten: string[];
+}
+
+/**
+ * Runs one of the {@link OFFERED_SCRIPTS}, in the first folder being read that has it.
+ *
+ * One folder, not all of them: a check reports on *a* repository, and running the same check in three clones
+ * produces three verdicts that nobody asked to compare.
+ */
+export async function runScript(
+  roots: readonly DocsRoot[],
+  output: vscode.OutputChannel,
+  id: string
+): Promise<ScriptRun | undefined> {
+  const offered = OFFERED_SCRIPTS.find((script) => script.id === id);
+  if (!offered) {
+    return undefined;
+  }
+
   const candidates = roots.filter((root) => root.origin !== 'catalog');
   if (candidates.length === 0) {
+    void vscode.window.showInformationMessage(
+      'Temco Knowledge: nothing on this machine is being read, so there is no repository to run that in. ' +
+        'A source read over the API has no working tree to check in.'
+    );
     return undefined;
   }
 
   output.appendLine('');
   for (const root of candidates) {
     const scripts = scriptsOf(root);
-    if (typeof scripts?.['docs:owed'] !== 'string') {
-      output.appendLine(`  ${root.folder.name}: no \`docs:owed\` script — nothing was run there.`);
+    if (typeof scripts?.[id] !== 'string') {
+      output.appendLine(`  ${root.folder.name}: no \`${id}\` script — nothing was run there.`);
       continue;
     }
 
-    output.appendLine(`Checking what documentation is owed in ${root.folder.name}: npm run docs:owed`);
-    const exit = await runTask(root, 'docs:owed');
-    output.appendLine(
-      `npm run docs:owed exited with ${exit === undefined ? 'no code' : exit} — its output above is the verdict.`
-    );
+    // The generator's output *is* files, so the honest report of a regeneration is which of them it rewrote.
+    const before = generated(root);
+    output.appendLine(`${offered.label} in ${root.folder.name}: npm run ${id}`);
+    const exit = await runTask(root, id);
+    output.appendLine(`npm run ${id} exited with ${exit === undefined ? 'no code' : exit}`);
+
+    const rewritten =
+      id === 'docs:registry'
+        ? [...generated(root)]
+            .filter(([name, stamp]) => before.get(name) !== stamp)
+            .map(([name]) => name)
+        : [];
+    for (const name of rewritten) {
+      output.appendLine(`  rewritten: ${name}`);
+    }
     output.show(true);
-    return { folder: root.folder.name, exit, at: new Date().toISOString().slice(0, 16).replace('T', ' ') };
+
+    return {
+      folder: root.folder.name,
+      script: id,
+      exit,
+      at: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      rewritten,
+    };
   }
 
-  output.appendLine('  No repository being read has a `docs:owed` script.');
+  output.appendLine(`  No repository being read has a \`${id}\` script.`);
   output.show(true);
   void vscode.window.showInformationMessage(
-    'Temco Knowledge: no repository being read has a docs:owed check, so there is nothing to run.'
+    `Temco Knowledge: no repository being read has a \`${id}\` script, so there is nothing to run.`
   );
   return undefined;
+}
+
+/** The files the generator owns, with a stamp that changes exactly when one of them is rewritten. */
+const GENERATED = [
+  'docs/help/index.json',
+  'docs/help/page-meta.json',
+  'docs/help/registry.json',
+  'docs/docfx.json',
+  'docs/toc.yml',
+  'docs/_admin/index.md',
+];
+
+function generated(root: DocsRoot): Map<string, string> {
+  const stamps = new Map<string, string>();
+  for (const name of GENERATED) {
+    const file = path.join(root.folder.uri.fsPath, ...name.split('/'));
+    try {
+      const stat = fs.statSync(file);
+      stamps.set(name, `${stat.mtimeMs}:${stat.size}`);
+    } catch {
+      stamps.set(name, 'missing');
+    }
+  }
+  return stamps;
+}
+
+/** The offered scripts the folders being read actually have — what may be offered to run, and nothing else. */
+export function scriptsIn(roots: readonly DocsRoot[]): Set<string> {
+  const names = new Set<string>();
+  for (const root of roots) {
+    if (root.origin === 'catalog') {
+      continue;
+    }
+    for (const name of Object.keys(scriptsOf(root) ?? {})) {
+      names.add(name);
+    }
+  }
+  return names;
+}
+
+/** The commands a person reaches for without opening a page: the generator, and the palette's list of all four. */
+export function registerScriptCommands(
+  context: vscode.ExtensionContext,
+  roots: () => readonly DocsRoot[],
+  output: vscode.OutputChannel,
+  refresh: () => void
+): void {
+  const run = async (id: string): Promise<void> => {
+    const result = await runScript(roots(), output, id);
+    // The generator rewrites what the tree reads — index.json carries the headings, the provenance and the
+    // stale verdict — so a regeneration that is not followed by a re-read would leave the view stale.
+    if (result !== undefined || id !== 'docs:registry') {
+      refresh();
+    }
+
+    if (result === undefined) {
+      return;
+    }
+    const exit = result.exit === undefined ? 'no exit code' : `exit ${result.exit}`;
+    void vscode.window.showInformationMessage(
+      `Temco Knowledge: npm run ${id} in ${result.folder} — ${exit}` +
+        (result.rewritten.length > 0 ? `, rewrote ${result.rewritten.length} file(s)` : '') +
+        '. Its own output is the verdict.'
+    );
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('temcoKnowledge.runScript', async (target?: unknown) => {
+      const wanted = typeof target === 'string' ? target : (target as { id?: string } | undefined)?.id;
+      if (wanted !== undefined && wanted.length > 0) {
+        await run(wanted);
+        return;
+      }
+
+      // No argument — from the palette or the Library's title bar: offer only what this repository actually has.
+      const names = scriptsIn(roots());
+      const offered = OFFERED_SCRIPTS.filter((script) => names.has(script.id));
+      if (offered.length === 0) {
+        void vscode.window.showInformationMessage(
+          'Temco Knowledge: the repository being read has none of these scripts — ' +
+            OFFERED_SCRIPTS.map((script) => `\`${script.id}\``).join(', ') +
+            '.'
+        );
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(
+        offered.map((script) => ({ label: script.label, detail: script.detail, description: script.id, id: script.id })),
+        { title: 'Run one of the repository’s own scripts' }
+      );
+      if (picked) {
+        await run(picked.id);
+      }
+    }),
+    vscode.commands.registerCommand('temcoKnowledge.runOwed', async () => run('docs:owed'))
+  );
 }
 
 /** Every file the run produced: newer than it started, and matching the recipe. */

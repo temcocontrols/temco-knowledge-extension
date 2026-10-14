@@ -5,6 +5,8 @@
 // dashboard shows, and both are plain text: an empty section is a sentence, never a button.
 
 import * as vscode from 'vscode';
+import { entryById } from './ai/catalog';
+import { aiStatus } from './ai/runtime';
 import { Catalog } from './catalog/store';
 import { slugOf } from './projectPage';
 import { DocsRoot, collectPages, countStale } from './registry';
@@ -91,6 +93,51 @@ class SectionView implements vscode.TreeDataProvider<Row> {
       return row.children;
     }
     return await this.library();
+  }
+
+  /**
+   * The AI, as one row at the end of the Library.
+   *
+   * It was reachable only from the command palette and from the panel's own title bar — which you cannot see
+   * when the panel is closed, which is exactly when you want it. The description carries the two facts that
+   * decide whether it can answer at all: which model, and whether the server is up.
+   */
+  private aiRow(): Row {
+    const status = aiStatus(this.context);
+    const model = status.model ? entryById(status.model.id)?.label ?? status.model.id : undefined;
+    const line = status.running
+      ? `${model ?? 'no model chosen'} · running on ${status.running.baseUrl}`
+      : model !== undefined
+        ? `${model} · stopped`
+        : status.runtime !== undefined
+          ? 'no model yet — the AI page lists what can be downloaded'
+          : 'nothing installed — the AI page lists what can be downloaded';
+
+    return new Row(
+      'The AI',
+      line,
+      'hubot',
+      [
+        new Row('Open the panel', 'the AI beside the page you are reading', 'comment-discussion', [], {
+          command: 'temcoKnowledge.ai.focus',
+          args: [],
+        }),
+        new Row('The AI page — runtime · model · prompts', 'download, choose, start, stop', 'settings-gear', [], {
+          command: 'temcoKnowledge.aiPage',
+          args: [],
+        }),
+        new Row('Models and Runtime…', 'the same list, for a keyboard user', 'list-selection', [], {
+          command: 'temcoKnowledge.models',
+          args: [],
+        }),
+        new Row('Open the model folder', 'where the downloads live — never in a repository', 'folder-opened', [], {
+          command: 'temcoKnowledge.openModelFolder',
+          args: [],
+        }),
+      ],
+      { command: 'temcoKnowledge.ai.focus', args: [] },
+      'ai'
+    );
   }
 
   /**
@@ -311,8 +358,11 @@ class SectionView implements vscode.TreeDataProvider<Row> {
           `${catalog.counts().length} tables · schema ${catalog.schemaVersion()} · on this machine`,
           'database'
         ),
-        // Last, not first: what wants a person is the loudest row, and the things you *have* come first.
+        // What wants a person, then the AI: the things you have, then what wants doing, then the helper.
         await this.attention(),
+        // Last, and last on purpose: the AI is a helper, not something to be managed. Clicking it opens the
+        // panel — the AI beside the page you are reading — and everything *about* the AI is one expansion down.
+        this.aiRow(),
       ];
     } catch {
       rows = [new Row('Catalog', 'not opened yet', 'database')];
