@@ -137,18 +137,23 @@ function folderItem(node: FolderNode): vscode.TreeItem {
     node.root.folder.name,
     node.root.areas.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None
   );
-  item.description = `${node.root.pages} pages`;
-  const stale = countStale(collectPages(node.root));
+  const { root } = node;
+  const recorded = root.origin === 'catalog';
+  item.description = recorded ? `${root.pages} pages · read from the source` : `${root.pages} pages`;
+  const stale = countStale(collectPages(root));
   item.tooltip = new vscode.MarkdownString(
     [
-      `**${node.root.folder.name}**`,
+      `**${root.folder.name}**`,
       '',
-      `${node.root.pages} pages · ${node.root.issues} issues · ${node.root.neverReviewed} never reviewed` +
-        (stale > 0 ? ` · ${stale} stale` : ''),
+      recorded
+        ? `${root.pages} pages as the read recorded them. The checks need a folder on this machine, so none ` +
+          'has been run on this source.'
+        : `${root.pages} pages · ${root.issues} issues · ${root.neverReviewed} never reviewed` +
+          (stale > 0 ? ` · ${stale} stale` : ''),
     ].join('\n')
   );
-  item.iconPath = new vscode.ThemeIcon('library');
-  item.contextValue = 'folder';
+  item.iconPath = new vscode.ThemeIcon(recorded ? 'cloud' : 'library');
+  item.contextValue = recorded ? 'source' : 'folder';
   return item;
 }
 
@@ -164,9 +169,16 @@ function areaItem(node: AreaNode): vscode.TreeItem {
     [
       `**${area.title}**`,
       '',
-      `audience: ${area.audience}${area.noindex ? ' · excluded from the published site' : ''}`,
-      `${area.pages} pages · ${area.neverReviewed} never reviewed${area.unshipped ? ` · ${area.unshipped} not shipped` : ''}` +
-        (stale > 0 ? ` · ${stale} stale` : ''),
+      [
+        area.audience ? `audience: ${area.audience}` : '',
+        area.noindex ? 'excluded from the published site' : '',
+        `${area.pages} pages`,
+        node.root.origin === 'catalog' ? '' : `${area.neverReviewed} never reviewed`,
+        area.unshipped ? `${area.unshipped} not shipped` : '',
+        stale > 0 ? `${stale} stale` : '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
     ].join('\n')
   );
   item.iconPath = new vscode.ThemeIcon('book');
@@ -189,12 +201,34 @@ function chapterItem(node: ChapterNode): vscode.TreeItem {
 
 function pageItem(node: PageNode): vscode.TreeItem {
   const { page } = node;
+  const recorded = page.origin === 'catalog';
   const stale = page.provenance?.stale === true;
   const item = new vscode.TreeItem(
     page.title,
     page.issues.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
   );
   item.id = `${node.root.folder.name}:${page.id}`;
+
+  if (recorded) {
+    // Nothing was checked and nothing was reviewed, so the row says what it is: a page a read told us about.
+    item.description = `${page.owner || 'no owner'} · read from the source`;
+    item.tooltip = new vscode.MarkdownString(
+      [
+        `**${page.title}**`,
+        '',
+        `id: \`${page.id}\``,
+        `owner: ${page.owner || '—'}`,
+        '',
+        `Read from ${node.root.folder.name}, which is not a folder on this machine — so the page's file, its ` +
+          'headings, its staleness and its structural checks are all unknown. Reading a clone of the source is ' +
+          'what makes them known.',
+      ].join('\n')
+    );
+    item.iconPath = new vscode.ThemeIcon('cloud', new vscode.ThemeColor('descriptionForeground'));
+    item.contextValue = 'catalogPage';
+    return item;
+  }
+
   item.description = `${stale ? 'stale · ' : ''}${page.owner}${page.ship ? '' : ' · not shipped'}${page.reviewed ? '' : ' · never reviewed'}`;
   item.tooltip = new vscode.MarkdownString(
     [

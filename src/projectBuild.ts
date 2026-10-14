@@ -23,6 +23,15 @@ const SCRIPTS: Record<string, readonly string[]> = {
   pdf: ['build:help:dry', 'docs:pdf'],
 };
 
+/**
+ * The generator, run first when the repository has one.
+ *
+ * It is what writes `docs/help/registry.json`'s neighbours — the index, the per-page metadata, the navbar — and
+ * therefore what makes headings, provenance and the stale verdict exist at all. Building without it produces a
+ * site that is missing whatever has changed since the last time someone ran it, which is the same as producing
+ * a wrong one. Invoked, never reimplemented: it is the repository's own script.
+ */
+const GENERATOR = ['docs:registry'];
 const SKIP = new Set(['node_modules', '.git', '.vs', 'out', 'target', '.venv', 'dist_cache']);
 
 export function registerProjectBuildCommands(context: vscode.ExtensionContext, output: vscode.OutputChannel): void {
@@ -87,7 +96,20 @@ async function buildProject(
     const buildId = catalog.startBuild(slug);
     const started = Date.now();
     output.appendLine('');
-    output.appendLine(`Building ${detail.name}: npm run ${script} in ${folder}`);
+
+    // The generator first, when there is one: it is what the output script reads its structure from.
+    const generator = GENERATOR.find((name) => scripts[name] !== undefined);
+    if (generator !== undefined) {
+      output.appendLine(`Building ${detail.name}: npm run ${generator} in ${folder} (the generator first)`);
+      const generated = await runTask(folder, generator);
+      output.appendLine(`npm run ${generator} exited with ${generated === undefined ? 'no code' : generated}`);
+    } else {
+      output.appendLine(
+        `Building ${detail.name}: npm run ${script} in ${folder} — no ${GENERATOR.map((name) => `\`${name}\``).join(' or ')} ` +
+          'script, so what is built is whatever the last run of the generator left behind.'
+      );
+    }
+
     const exit = await runTask(folder, script);
     output.appendLine(`npm run ${script} exited with ${exit === undefined ? 'no code' : exit}`);
 

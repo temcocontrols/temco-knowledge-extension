@@ -11,7 +11,9 @@ import * as vscode from 'vscode';
 import { Catalog, CatalogUnavailable } from './catalog/store';
 import { DocsRoot, collectPages, countStale, totals } from './registry';
 
+import { slugOf } from './projectPage';
 import { HOME_VIEW_TYPE, pageColumn } from './surface';
+import { Selection } from './selected';
 
 interface Feature {
   name: string;
@@ -77,6 +79,7 @@ export class HomePanel {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
+    private readonly selection: Selection,
     private readonly roots: () => readonly DocsRoot[]
   ) {}
 
@@ -178,6 +181,13 @@ export class HomePanel {
       ];
     });
 
+    // What is being read, and what it is read *from*: with a project selected the answer is the project's
+    // sources, not the window's folders — the same one world the Workspace view shows.
+    const project = this.selection.project();
+    const projectName = project === undefined ? undefined : documents.find((row) => slugOf(row.name) === project)?.name;
+    const reading =
+      projectName ?? (roots.length === 1 ? roots[0].folder.name : `${roots.length} open folders`);
+
     const body = `
       <header class="top">
         <div class="ident">
@@ -191,7 +201,7 @@ export class HomePanel {
             <p class="meta">
               v${escapeHtml(String(manifest.version ?? '—'))}
               <span class="dot">·</span> ${escapeHtml(String(manifest.publisher ?? '—'))}
-              <span class="dot">·</span> ${roots.length} open folder${roots.length === 1 ? '' : 's'}
+              <span class="dot">·</span> ${roots.length} source${roots.length === 1 ? '' : 's'} being read
               <span class="dot">·</span> ${sums.pages} pages
             </p>
             <p class="lede">Reads every project’s documentation where it already lives, keeps what it finds in one
@@ -209,15 +219,18 @@ export class HomePanel {
         <section>
           <h2>What we have now</h2>
           <table class="facts">
-            <tr><th>Documents</th><td>${documents.length}</td><th>Sources</th><td>${sources.length}</td></tr>
-            <tr><th>Folders open</th><td>${roots.length}</td><th>Pages</th><td>${sums.pages}</td></tr>
+            <tr><th>Working on</th><td>${escapeHtml(reading)}</td><th>Pages</th><td>${sums.pages}</td></tr>
+            <tr><th>Projects</th><td>${documents.length}</td><th>Sources</th><td>${sources.length}</td></tr>
             <tr><th>Issues</th><td>${sums.issues}</td><th>Unseen changes</th><td>${unseen}</td></tr>
           </table>
           ${
             roots.length === 0
-              ? `<p class="quiet">No folder with a <code>docs/help/registry.json</code> is open, so nothing is
-                   being measured yet.</p>`
-              : table(['Folder', 'Pages', 'Errors', 'Warnings', 'Never reviewed', 'Stale'], openRows)
+              ? `<p class="quiet">${escapeHtml(
+                  projectName !== undefined
+                    ? `${projectName} has no source that can be read yet — add one from the Library or the project's own page, then read it.`
+                    : 'Nothing is being read: no project is being worked on and no open folder holds a docs/help/registry.json.'
+                )}</p>`
+              : table(['Source', 'Pages', 'Errors', 'Warnings', 'Never reviewed', 'Stale'], openRows)
           }
           <p class="quiet">Kept in one SQLite database on this machine — never in a repository, never
           committed, ${counts.length} tables at schema ${schema}${

@@ -443,6 +443,19 @@ export class Catalog {
     this.db.prepare('DELETE FROM documents WHERE slug = ?').run(slug);
   }
 
+  /**
+   * The branch a source is read at. Empty clears it, so the default branch is used again.
+   *
+   * The recorded pages are dropped with it, because they described *another* branch: keeping them would let a
+   * read that never happened look like a read that did. The source becomes unread, which is what makes
+   * "read every unread source" pick it up again.
+   */
+  setSourceBranch(slug: string, branch: string | undefined): void {
+    this.db
+      .prepare('UPDATE sources SET branch = ?, pages = NULL, state = ? WHERE slug = ?')
+      .run(branch ?? null, 'the branch changed — read it again', slug);
+  }
+
   /** One source's coordinates — everything a read needs, and nothing else. */
   source(slug: string): SourceDetail | undefined {
     const row = this.db

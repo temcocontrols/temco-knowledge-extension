@@ -8,19 +8,50 @@ import * as vscode from 'vscode';
 import { Catalog } from './catalog/store';
 import { slugOf } from './projectPage';
 import { DocsRoot, collectPages, countStale } from './registry';
+import { Selection } from './selected';
 
 export const WORK_VIEW_ID = 'temcoKnowledge.work';
 export const LIBRARY_VIEW_ID = 'temcoKnowledge.library';
 
-class Row {
+export class Row {
   constructor(
     readonly label: string,
     readonly description: string,
     readonly icon: string,
     readonly children: Row[] = [],
     /** What clicking the row does. Only rows that stand for something openable have one. */
-    readonly command?: { command: string; args: unknown[] }
+    readonly command?: { command: string; args: unknown[] },
+    /**
+     * What a context menu can match: `project`, `source`, `page`. Unset on a row that is only text — a heading,
+     * a count, an empty-state sentence — so nothing offers an action on something that is not a thing.
+     */
+    readonly contextValue?: string,
+    /** The catalog slug this row stands for, when it stands for one. */
+    readonly slug?: string
   ) {}
+}
+
+/**
+ * A row's slug, whatever the caller was handed.
+ *
+ * A context-menu command receives the tree element — a {@link Row} — while the same command is also useful with
+ * a slug from a keybinding or a test. Both arrive here, and both leave as a slug or nothing.
+ */
+export function rowSlug(target: unknown): string | undefined {
+  if (typeof target === 'string') {
+    return target.length > 0 ? target : undefined;
+  }
+  if (target !== null && typeof target === 'object') {
+    const direct = (target as { slug?: unknown }).slug;
+    if (typeof direct === 'string' && direct.length > 0) {
+      return direct;
+    }
+    const first = (target as { command?: { args?: unknown[] } }).command?.args?.[0];
+    if (typeof first === 'string' && first.length > 0) {
+      return first;
+    }
+  }
+  return undefined;
 }
 
 class SectionView implements vscode.TreeDataProvider<Row> {
@@ -29,6 +60,7 @@ class SectionView implements vscode.TreeDataProvider<Row> {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
+    private readonly selection: Selection,
     private readonly roots: () => readonly DocsRoot[],
     private readonly kind: 'work' | 'library'
   ) {}
@@ -46,6 +78,9 @@ class SectionView implements vscode.TreeDataProvider<Row> {
     );
     item.description = row.description;
     item.iconPath = new vscode.ThemeIcon(row.icon);
+    if (row.contextValue !== undefined) {
+      item.contextValue = row.contextValue;
+    }
     item.tooltip = row.description ? `${row.label} — ${row.description}` : row.label;
     if (row.command) {
       item.command = { command: row.command.command, title: row.label, arguments: row.command.args };
@@ -138,6 +173,7 @@ class SectionView implements vscode.TreeDataProvider<Row> {
 
       const documentRows = documents.map((document) => {
         const slug = slugOf(document.name);
+        const current = this.selection.project() === slug;
         const cited = catalog !== undefined ? catalog.documentSources(slug) : [];
         const artifacts = catalog !== undefined ? catalog.documentArtifacts(slug) : [];
 
@@ -168,15 +204,18 @@ class SectionView implements vscode.TreeDataProvider<Row> {
         return new Row(
           document.name,
           [
+            current ? 'being worked on' : undefined,
             document.version ? `v${document.version}` : undefined,
             `${document.sources} source${document.sources === 1 ? '' : 's'}`,
             document.builtAt ? 'built' : 'never built',
           ]
             .filter((part): part is string => Boolean(part))
             .join(' · '),
-          'book',
+          current ? 'pass-filled' : 'book',
           children,
-          { command: 'temcoKnowledge.openProject', args: [slug] }
+          { command: 'temcoKnowledge.openProject', args: [slug] },
+          'project',
+          slug
         );
       });
 
@@ -202,14 +241,30 @@ class SectionView implements vscode.TreeDataProvider<Row> {
                 [page.id, page.owner].filter((part): part is string => Boolean(part)).join(' · '),
                 'markdown',
                 [],
-                page.path ? { command: 'temcoKnowledge.openFile', args: [page.path] } : undefined
+                page.path
+                  ? { command: 'temcoKnowledge.openFile', args: [{ path: page.path, id: page.id, title: page.title }] }
+                  : undefined,
+                page.path ? 'page' : undefined,
+                page.id
               )
-          )
+          ),
+          undefined,
+          'source',
+          source.slug
         );
       });
 
       rows = [
-        new Row('Projects', documents.length === 0 ? 'none created yet' : String(documents.length), 'library', documentRows),
+        // The row itself opens the page: a list of names in a tree has no room to say anything about a project,
+        // and the page has room for all of it plus what can be done.
+        new Row(
+          'Projects',
+          documents.length === 0 ? 'none created yet' : String(documents.length),
+          'library',
+          documentRows,
+          { command: 'temcoKnowledge.openProjects', args: [] },
+          'projects'
+        ),
         new Row(
           'Sources',
           sources.length === 0 ? 'none recorded yet' : String(sources.length),
@@ -246,10 +301,11 @@ class SectionView implements vscode.TreeDataProvider<Row> {
 
 export function registerSectionViews(
   context: vscode.ExtensionContext,
+  selection: Selection,
   roots: () => readonly DocsRoot[]
 ): { refresh(): void } {
-  const work = new SectionView(context, roots, 'work');
-  const library = new SectionView(context, roots, 'library');
+  const work = new SectionView(context, selection, roots, 'work');
+  const library = new SectionView(context, selection, roots, 'library');
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider(WORK_VIEW_ID, work),
     vscode.window.registerTreeDataProvider(LIBRARY_VIEW_ID, library)

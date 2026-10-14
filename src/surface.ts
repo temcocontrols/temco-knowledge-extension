@@ -18,6 +18,7 @@
 import * as vscode from 'vscode';
 
 export const HOME_VIEW_TYPE = 'temcoKnowledge.home';
+export const PROJECTS_VIEW_TYPE = 'temcoKnowledge.projects';
 export const PROJECT_VIEW_TYPE = 'temcoKnowledge.project';
 export const HUB_VIEW_TYPE = 'temcoKnowledge.projectHub';
 export const AI_PAGE_VIEW_TYPE = 'temcoKnowledge.aiPage';

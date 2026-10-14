@@ -98,6 +98,14 @@ export interface PageEntry {
   issues: Issue[];
   /** What the generator knows about this page; undefined when neither neighbour file could be read. */
   provenance?: Provenance;
+  /**
+   * Where this entry came from.
+   *
+   * `workspace` (the default) is a registry read from a folder, with the working tree behind it, so the checks
+   * and the provenance are real. `catalog` is what a *read* recorded of a source that is not on this machine:
+   * the page and its owner are known, and nothing else is knowable — so nothing else may be claimed.
+   */
+  origin?: 'workspace' | 'catalog';
 }
 
 export interface ChapterGroup {
@@ -129,6 +137,8 @@ export interface DocsRoot extends Counts {
   areas: AreaGroup[];
   /** Problems that belong to one whole file — `registry.json` unless the generator's file is at fault. */
   problems: RootProblem[];
+  /** Where this root came from: a folder read here, or what a read recorded in the catalog. */
+  origin?: 'workspace' | 'catalog';
 }
 
 /** Thrown when the registry cannot be read at all, so the caller can show one clear message. */
@@ -168,6 +178,113 @@ export function pageForUri(roots: readonly DocsRoot[], uri: vscode.Uri): PageEnt
     }
   }
   return undefined;
+}
+
+/**
+ * A folder that is not open in the window, as a workspace folder.
+ *
+ * `loadDocsRoot` needs a `uri` and a `name`, which is all a `WorkspaceFolder` is — so a path a **project**
+ * cites is read with the full checks even when the window has that folder closed. That is what lets the
+ * Workspace view follow the project instead of the window.
+ */
+export function folderForPath(path: string, name: string): vscode.WorkspaceFolder {
+  return { uri: vscode.Uri.file(path), name, index: 0 };
+}
+
+/** A page as a read recorded it — the four facts a tree can honestly show. */
+export interface DeclaredPage {
+  id: string;
+  title?: string;
+  owner?: string;
+}
+
+/**
+ * A root built from what a read recorded, for a source that is not a folder on this machine.
+ *
+ * The tree's shape is the registry's shape, so a source read over the API gets the same
+ * areas → chapters → pages as a local one, from the same `PageEntry` type. What it cannot have is the *checks*:
+ * those need the working tree. So `issues` is empty, `exists` is true because nothing here can prove
+ * otherwise, and every page carries `origin: 'catalog'` — the view says where a page came from rather than
+ * letting an unchecked page look like a checked one.
+ */
+export function rootFromDeclared(name: string, pages: readonly DeclaredPage[]): DocsRoot {
+  const areas = new Map<string, Map<string, PageEntry[]>>();
+
+  for (const page of pages) {
+    const segments = page.id.split('/');
+    const area = segments[0] ?? '';
+    const chapter = segments.length > 2 ? segments[1] ?? '' : '';
+    const entry: PageEntry = {
+      id: page.id,
+      title: page.title ?? page.id,
+      area,
+      chapter,
+      order: 0,
+      audience: '',
+      ship: true,
+      owner: page.owner ?? '',
+      reviewed: null,
+      tags: [],
+      keywords: [],
+      // Not a file uri: these pages are not on this machine, and nothing may try to open them as if they were.
+      uri: vscode.Uri.from({ scheme: 'temco-source', path: `/${page.id}` }),
+      exists: true,
+      issues: [],
+      origin: 'catalog',
+    };
+    const chapters = areas.get(area) ?? new Map<string, PageEntry[]>();
+    chapters.set(chapter, [...(chapters.get(chapter) ?? []), entry]);
+    areas.set(area, chapters);
+  }
+
+  const groups: AreaGroup[] = [...areas].map(([area, chapters]) => {
+    const grouped: ChapterGroup[] = [...chapters].map(([chapter, entries]) => ({
+      chapter: chapter || area,
+      pages: entries.sort((a, b) => a.id.localeCompare(b.id)),
+    }));
+    return {
+      area,
+      title: area,
+      audience: '',
+      noindex: false,
+      chapters: grouped,
+      ...countEntries(grouped.flatMap((group) => group.pages)),
+    };
+  });
+
+  const folderUri = vscode.Uri.from({ scheme: 'temco-source', path: `/${name}` });
+  return {
+    folder: { uri: folderUri, name, index: 0 },
+    rootUri: folderUri,
+    registryUri: vscode.Uri.from({ scheme: 'temco-source', path: `/${name}/docs/help/registry.json` }),
+    areas: groups.sort((a, b) => a.area.localeCompare(b.area)),
+    problems: [],
+    ...countEntries(pages.map(() => ({ exists: true, issues: [] as Issue[] }))),
+    origin: 'catalog',
+  };
+}
+
+function countEntries(entries: readonly Pick<PageEntry, 'exists' | 'issues'>[]): Counts {
+  let errors = 0;
+  let warnings = 0;
+  for (const entry of entries) {
+    for (const issue of entry.issues) {
+      if (issue.severity === 'error') {
+        errors += 1;
+      } else {
+        warnings += 1;
+      }
+    }
+  }
+  return {
+    pages: entries.length,
+    issues: errors + warnings,
+    errors,
+    warnings,
+    // Nothing recorded a review date, so claiming "never reviewed" would be inventing a fault.
+    neverReviewed: 0,
+    unshipped: 0,
+  };
 }
 
 export function totals(roots: readonly DocsRoot[]): Counts {

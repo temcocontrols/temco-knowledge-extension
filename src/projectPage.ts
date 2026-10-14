@@ -13,6 +13,7 @@
 
 import * as vscode from 'vscode';
 import { Catalog, CatalogUnavailable, DocumentDetail } from './catalog/store';
+import { Selection } from './selected';
 import { PROJECT_VIEW_TYPE, pageColumn } from './surface';
 
 /** A source as the page collects it — `url` for a repository, `path` for a folder or archive. */
@@ -49,7 +50,9 @@ export class ProjectPage {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly refresh: () => void
+    private readonly selection: Selection,
+    /** Called after a write. The slug is passed when the project itself was removed. */
+    private readonly refresh: (removed?: string) => void
   ) {}
 
   /** A new project. It can be created with no sources at all — that is the point of it being a project. */
@@ -223,6 +226,8 @@ export class ProjectPage {
       return;
     }
 
+    // A project you have just made is the one you are working on: it is what the Workspace view and the AI read.
+    await this.selection.select(slug);
     this.refresh();
     this.panel?.dispose();
     void vscode.window.showInformationMessage(
@@ -242,10 +247,16 @@ export class ProjectPage {
       return;
     }
     const ok = await this.withCatalog((catalog) => catalog.deleteDocument(this.slug));
-    if (ok) {
-      this.refresh();
-      this.panel?.dispose();
+    if (!ok) {
+      return;
     }
+    // Its own page goes (this one), the projects page comes back: nothing is left pointing at a project that
+    // is no longer there.
+    const slug = this.slug;
+    this.panel?.dispose();
+    this.refresh(slug);
+    await vscode.commands.executeCommand('temcoKnowledge.openProjects');
+    void vscode.window.showInformationMessage('Temco Knowledge: the project is removed.');
   }
 
   /** Opens the catalog, runs the work, closes it — and reports a refusal in words rather than a stack trace. */

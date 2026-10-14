@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import { DocsRoot, PageEntry, collectPages, pageForUri } from '../registry';
+import { Selection } from '../selected';
 import { entryById } from './catalog';
 import {
   Candidate,
@@ -49,7 +50,8 @@ export class AiPanel implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly roots: () => readonly DocsRoot[]
+    private readonly roots: () => readonly DocsRoot[],
+    private readonly selection: Selection
   ) {}
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -75,6 +77,10 @@ export class AiPanel implements vscode.WebviewViewProvider {
       page: page
         ? { title: page.title, id: page.id, stale: page.provenance?.stale === true }
         : undefined,
+      // Which project the question is about, in the panel rather than in the reader's head: the pages this
+      // answers from are the selected project's, so a panel that did not say so would be answering about
+      // something the reader cannot see.
+      project: this.selection.project(),
       model: status.model ? entryById(status.model.id)?.label ?? status.model.id : undefined,
       runtimeReady: status.runtime !== undefined,
       version: PROMPT_VERSION,
@@ -410,10 +416,20 @@ export class AiPanel implements vscode.WebviewViewProvider {
 
   private page(): PageEntry | undefined {
     const uri = vscode.window.activeTextEditor?.document.uri;
-    if (!uri || uri.scheme !== 'file') {
-      return undefined;
+    if (uri && uri.scheme === 'file') {
+      const open = pageForUri(this.roots(), uri);
+      if (open) {
+        return open;
+      }
     }
-    return pageForUri(this.roots(), uri);
+    // Nothing of ours is open in an editor — so the page the project remembers stands in, when the roots being
+    // read contain it. That is what lets a question be asked from the hub, about the page you were just on,
+    // without a text editor being open at all.
+    const remembered = this.selection.page();
+    if (remembered?.path !== undefined) {
+      return pageForUri(this.roots(), vscode.Uri.file(remembered.path));
+    }
+    return undefined;
   }
 
   private async pageContext(entry: PageEntry | undefined): Promise<PageContext | undefined> {

@@ -13,7 +13,9 @@ import { aiStatus } from './ai/runtime';
 import { MODELS, RUNTIMES } from './ai/catalog';
 import { PROMPT_VERSION } from './ai/prompts';
 import { Catalog, CatalogUnavailable } from './catalog/store';
+import { Selection } from './selected';
 import { HUB_VIEW_TYPE, pageColumn } from './surface';
+import { slugOf } from './projectPage';
 
 /** Where a chapter stops being a chapter. A count, not a rule — it is advice the page shows, never a problem. */
 const CHAPTER_LIMIT = 25;
@@ -25,22 +27,56 @@ interface Suggestion {
 }
 
 interface HubMessage {
-  type: 'ready' | 'edit' | 'addSource' | 'read' | 'build' | 'openPage' | 'models' | 'openModelFolder' | 'refresh';
+  type:
+    | 'ready'
+    | 'edit'
+    | 'addSourceSubmit'
+    | 'pick'
+    | 'read'
+    | 'readAll'
+    | 'build'
+    | 'openPage'
+    | 'select'
+    | 'clear'
+    | 'models'
+    | 'openModelFolder';
   slug?: string;
   path?: string;
+  id?: string;
+  title?: string;
+  kind?: 'git' | 'folder' | 'archive';
+  url?: string;
+  branch?: string;
+  name?: string;
 }
 
 export class ProjectHub {
   private panel: vscode.WebviewPanel | undefined;
   private slug = '';
+  private tab: 'overview' | 'pages' | 'sources' | 'ai' | 'builds' = 'overview';
+  /** Set only when a caller asked for a tab — otherwise the page keeps the tab the reader chose. */
+  private askedTab?: 'overview' | 'pages' | 'sources' | 'ai' | 'builds';
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly refresh: () => void
+    private readonly selection: Selection,
+    /** Called after a write. The slug is passed when the project itself was removed. */
+    private readonly refresh: (removed?: string) => void
   ) {}
 
-  open(slug: string): void {
+  /**
+   * Opens a project's page — and makes it *the* project.
+   *
+   * Opening a project and working on it are the same act in this application: the Workspace view, the counts,
+   * the faults and the AI all read the selected project, so a page that changed without saying so would leave
+   * the sidebar answering about something else.
+   */
+  open(slug: string, tab?: 'overview' | 'pages' | 'sources' | 'ai' | 'builds'): void {
     this.slug = slug;
+    this.tab = tab ?? this.tab;
+    this.askedTab = tab;
+    void this.selection.select(slug);
+
     if (this.panel) {
       this.panel.title = `Project — ${slug}`;
       this.panel.reveal(pageColumn());
@@ -60,22 +96,70 @@ export class ProjectHub {
     });
   }
 
+  /**
+   * Told by whoever removed a project.
+   *
+   * A tab about something that no longer exists is worse than no tab: this closes, and the removal opens the
+   * projects page — where what is left is listed, which is the one useful thing to show. Any *other* open
+   * project just re-reads itself.
+   */
+  notifyRemoved(slug: string): void {
+    if (!this.panel) {
+      return;
+    }
+    if (this.slug === slug) {
+      this.panel.dispose();
+      return;
+    }
+    void this.seed();
+  }
+
   private async receive(message: HubMessage): Promise<void> {
     switch (message.type) {
       case 'ready':
-      case 'refresh':
         await this.seed();
         return;
       case 'edit':
         await vscode.commands.executeCommand('temcoKnowledge.editProject', this.slug);
         return;
-      case 'addSource':
-        await vscode.commands.executeCommand('temcoKnowledge.addSource');
-        await this.seed();
-        return;
       case 'read':
         await vscode.commands.executeCommand('temcoKnowledge.readSource', message.slug);
         await this.seed();
+        this.refresh();
+        return;
+      case 'readAll':
+        await vscode.commands.executeCommand('temcoKnowledge.readAllSources');
+        await this.seed();
+        this.refresh();
+        return;
+      case 'addSourceSubmit':
+        await this.addSource(message);
+        return;
+      case 'pick': {
+        const kind = message.kind === 'archive' ? 'archive' : 'folder';
+        const picked = await vscode.window.showOpenDialog({
+          title: kind === 'folder' ? 'Which folder?' : 'Which file?',
+          canSelectFolders: kind === 'folder',
+          canSelectFiles: kind === 'archive',
+          canSelectMany: false,
+          openLabel: 'Use this',
+        });
+        if (picked && picked.length > 0) {
+          await this.panel?.webview.postMessage({
+            type: 'picked',
+            kind,
+            name: picked[0].path.split('/').filter(Boolean).pop() ?? picked[0].fsPath,
+            path: picked[0].fsPath,
+          });
+        }
+        return;
+      }
+      case 'select':
+        await this.selection.select(this.slug);
+        this.refresh();
+        return;
+      case 'clear':
+        await this.selection.select(undefined);
         this.refresh();
         return;
       case 'build':
@@ -83,7 +167,11 @@ export class ProjectHub {
         await this.seed();
         return;
       case 'openPage':
-        await vscode.commands.executeCommand('temcoKnowledge.openFile', message.path);
+        await vscode.commands.executeCommand('temcoKnowledge.openFile', {
+          path: message.path,
+          id: message.id,
+          title: message.title,
+        });
         return;
       case 'models':
         await vscode.commands.executeCommand('temcoKnowledge.aiPage');
@@ -92,6 +180,48 @@ export class ProjectHub {
         await vscode.commands.executeCommand('temcoKnowledge.openModelFolder');
         return;
     }
+  }
+
+  /**
+   * Adds one source to this project, from the Sources tab.
+   *
+   * A source is added once and cited by any number of projects, so this records it in the catalog and cites it
+   * here — the same two calls the create page makes, without asking for the project's own fields again.
+   */
+  private async addSource(message: HubMessage): Promise<void> {
+    const kind = message.kind ?? 'git';
+    const name = (message.name ?? '').trim();
+    if (kind === 'git' && (message.url ?? '').trim().length < 3) {
+      void vscode.window.showWarningMessage('Temco Knowledge: a repository needs an owner/name or a URL.');
+      return;
+    }
+    if (kind !== 'git' && name.length === 0) {
+      void vscode.window.showWarningMessage('Temco Knowledge: that source has no name.');
+      return;
+    }
+
+    const slug = this.slug;
+    const ok = await this.withCatalog((catalog) => {
+      const sourceSlug = slugOf(name);
+      catalog.addSource({
+        kind,
+        name,
+        slug: sourceSlug,
+        remoteUrl: kind === 'git' ? (message.url ?? '').trim() : undefined,
+        path: kind === 'git' ? undefined : message.path,
+        branch: (message.branch ?? '').trim() || undefined,
+      });
+      catalog.attachSource(slug, sourceSlug);
+    });
+
+    if (!ok) {
+      return;
+    }
+    this.refresh();
+    await this.seed();
+    void vscode.window.showInformationMessage(
+      `Temco Knowledge: ${name} is now a source of this project. Read it to see its pages.`
+    );
   }
 
   /** Everything the five tabs show, gathered once per save. */
@@ -105,7 +235,10 @@ export class ProjectHub {
       catalog = await Catalog.open(this.context);
       const detail = catalog.document(this.slug);
       if (!detail) {
-        await this.panel.webview.postMessage({ type: 'gone', slug: this.slug });
+        // Opened for a project that is not there — a stale menu argument, or a removal that did not tell us.
+        // Either way this is not the page to be on, so it goes and the list of what exists replaces it.
+        this.panel?.dispose();
+        await vscode.commands.executeCommand('temcoKnowledge.openProjects');
         return;
       }
 
@@ -166,6 +299,8 @@ export class ProjectHub {
           promptVersion: PROMPT_VERSION,
           known,
         },
+        selected: this.selection.project() === slug,
+        tab: this.askedTab,
         suggestions: this.suggest({
           pages,
           sources: sources.map((source) => ({ name: source.name, kind: source.kind, read: source.state })),
@@ -173,12 +308,30 @@ export class ProjectHub {
           artifacts: artifacts.length,
         }),
       });
+      // Asked once, honoured once: a re-render after a read must not pull the reader off the tab they chose.
+      this.askedTab = undefined;
     } catch (error) {
       if (error instanceof CatalogUnavailable) {
         void vscode.window.showErrorMessage(`Temco Knowledge: ${error.message}`);
       } else {
         void vscode.window.showErrorMessage(`Temco Knowledge: ${String(error)}`);
       }
+    } finally {
+      catalog?.close();
+    }
+  }
+
+  /** Opens the catalog, runs the work, closes it — and reports a refusal in words rather than a stack trace. */
+  private async withCatalog(work: (catalog: Catalog) => void): Promise<boolean> {
+    let catalog: Catalog | undefined;
+    try {
+      catalog = await Catalog.open(this.context);
+      work(catalog);
+      return true;
+    } catch (error) {
+      const message = error instanceof CatalogUnavailable ? error.message : String(error);
+      void vscode.window.showErrorMessage(`Temco Knowledge: ${message}`);
+      return false;
     } finally {
       catalog?.close();
     }
@@ -318,6 +471,16 @@ function html(script: string): string {
     h3 { font-size: .95em; font-weight: 600; margin: 1.2em 0 .4em; }
     p { line-height: 1.55; margin: .3em 0; }
     .meta { color: var(--vscode-descriptionForeground); margin: 0 0 1em; }
+    .addform { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16em, 100%), 1fr));
+               gap: .8em 1.4em; max-width: 70em; align-items: end; }
+    .addform > div { min-width: 0; }
+    .addform label { display: block; color: var(--vscode-descriptionForeground); margin-bottom: .2em; }
+    .addform input { width: 100%; min-width: 0; padding: .3em .5em; box-sizing: border-box;
+                     color: var(--vscode-input-foreground); background: var(--vscode-input-background);
+                     border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px;
+                     font-family: inherit; font-size: inherit; }
+    .addform input:focus { outline: 1px solid var(--vscode-focusBorder); }
+    .addform .do { display: flex; gap: .5em; flex-wrap: wrap; }
     .tabs { display: flex; gap: .2em; border-bottom: 1px solid var(--vscode-panel-border); margin: 0 0 1.2em;
             flex-wrap: wrap; }
     .tabs button { border: none; background: none; color: var(--vscode-foreground); padding: .5em .9em;
@@ -376,10 +539,11 @@ function html(script: string): string {
   <p class="meta" id="meta"></p>
 
   <div class="actions">
-    <button class="primary" id="read">Read the sources</button>
+    <button class="primary" id="read">Read every source</button>
     <button id="build">Build</button>
     <button id="add">Add a source</button>
     <button id="edit">Edit this project</button>
+    <button id="work"></button>
   </div>
 
   <div class="tabs" role="tablist">
@@ -403,7 +567,26 @@ function html(script: string): string {
 
   <section id="tab-sources" hidden>
     <h2>Sources</h2>
+    <p class="meta">What this project is built from. A source is recorded once and cited by any number of
+      projects; reading one is what fills its pages in.</p>
     <div id="sources"></div>
+
+    <h3>Add a source</h3>
+    <div class="addform">
+      <div>
+        <label for="addUrl">Repository — owner/name or a full URL</label>
+        <input id="addUrl" type="text" placeholder="owner/name" autocomplete="off">
+      </div>
+      <div>
+        <label for="addBranch">Branch</label>
+        <input id="addBranch" type="text" placeholder="main" autocomplete="off">
+      </div>
+      <div class="do">
+        <button class="primary" id="addRepo">Add repository</button>
+        <button id="addFolder">Add a folder…</button>
+        <button id="addArchive">Add an archive…</button>
+      </div>
+    </div>
   </section>
 
   <section id="tab-ai" hidden>
@@ -431,25 +614,54 @@ function html(script: string): string {
 const vscode = acquireVsCodeApi();
 const $ = (id) => document.getElementById(id);
 let picture = null;
+/** The tab the reader is on. The extension only overrides it when it asked for a tab on purpose. */
+let currentTab = 'overview';
 
-for (const button of document.querySelectorAll('.tabs button')) {
-  button.addEventListener('click', () => {
-    for (const other of document.querySelectorAll('.tabs button')) {
-      other.setAttribute('aria-selected', String(other === button));
-    }
-    for (const section of document.querySelectorAll('section')) {
-      section.hidden = section.id !== 'tab-' + button.dataset.tab;
-    }
-  });
+/**
+ * The tab the reader is on, drawn. The extension only overrides it when it asked for a tab on purpose, so a
+ * re-render after a read never pulls the reader off the tab they chose.
+ */
+function showTab(which) {
+  currentTab = which;
+  for (const button of document.querySelectorAll('.tabs button')) {
+    button.setAttribute('aria-selected', String(button.dataset.tab === which));
+  }
+  for (const section of document.querySelectorAll('section')) {
+    section.hidden = section.id !== 'tab-' + which;
+  }
 }
 
-$('read').addEventListener('click', () => {
-  const never = (picture?.sources ?? []).find((source) => !source.read) ?? picture?.sources?.[0];
-  vscode.postMessage({ type: 'read', slug: never?.slug });
-});
+for (const button of document.querySelectorAll('.tabs button')) {
+  button.addEventListener('click', () => showTab(button.dataset.tab));
+}
+
+$('read').addEventListener('click', () => vscode.postMessage({ type: 'readAll' }));
 $('build').addEventListener('click', () => vscode.postMessage({ type: 'build' }));
-$('add').addEventListener('click', () => vscode.postMessage({ type: 'addSource' }));
+// Adding a source is a small form on the Sources tab — not the project's own edit page, which would ask for
+// every field again to make one decision.
+$('add').addEventListener('click', () => {
+  showTab('sources');
+  $('addUrl').focus();
+});
 $('edit').addEventListener('click', () => vscode.postMessage({ type: 'edit' }));
+
+document.getElementById('work').addEventListener('click', () => {
+  // One button for both directions: which one it is follows the page's own state, not a second control.
+  const selected = Boolean(picture?.selected);
+  vscode.postMessage({ type: selected ? 'clear' : 'select' });
+});
+
+/* A button is wired to exactly one handler, in one block, further down this script. An earlier version wired
+   four of them twice — the second, stale block won, and *Add a source* opened the edit form. */
+
+$('addRepo').addEventListener('click', () => {
+  const url = $('addUrl').value.trim();
+  if (url.length < 3) { $('addUrl').focus(); return; }
+  const name = url.replace(/\.git$/, '').split('/').filter(Boolean).pop() || 'repository';
+  vscode.postMessage({ type: 'addSourceSubmit', kind: 'git', name, url, branch: $('addBranch').value.trim() });
+});
+$('addFolder').addEventListener('click', () => vscode.postMessage({ type: 'pick', kind: 'folder' }));
+$('addArchive').addEventListener('click', () => vscode.postMessage({ type: 'pick', kind: 'archive' }));
 $('models').addEventListener('click', () => vscode.postMessage({ type: 'models' }));
 $('folder').addEventListener('click', () => vscode.postMessage({ type: 'openModelFolder' }));
 
@@ -496,6 +708,7 @@ function render(data) {
   picture = data;
   const project = data.project;
   $('name').textContent = project.name;
+  $('work').textContent = data.selected ? 'Stop working on this project' : 'Work on this project';
   $('meta').textContent = line(
     project.version ? 'v' + project.version : undefined,
     project.owner ? 'owned by ' + project.owner : 'no owner',
@@ -514,6 +727,7 @@ function render(data) {
 
   const overview = $('overview');
   overview.replaceChildren(
+    fact('Being worked on', data.selected ? 'yes — the Workspace view and the AI follow this project' : 'no'),
     fact('Pages', String(data.counts.pages)),
     fact('Sources', String(data.counts.sources)),
     fact('Outputs', project.outputs.length === 0 ? 'none chosen' : project.outputs.join(', ')),
@@ -528,7 +742,7 @@ function render(data) {
       empty(
         data.sources.length === 0
           ? 'Nothing to show: this project cites no sources. Add one, then read it.'
-          : 'Nothing read yet. Use Read the sources — its pages appear here once it has been read.'
+          : 'Nothing read yet. Use Read every source — its pages appear here once it has been read.'
       )
     );
   } else {
@@ -557,7 +771,9 @@ function render(data) {
         const link = document.createElement('a');
         link.className = 'link';
         link.textContent = 'Open';
-        link.addEventListener('click', () => vscode.postMessage({ type: 'openPage', path: page.path }));
+        link.addEventListener('click', () =>
+          vscode.postMessage({ type: 'openPage', path: page.path, id: page.id, title: page.title })
+        );
         act.append(link);
       }
       row.append(title, id, owner, where, act);
@@ -583,7 +799,7 @@ function render(data) {
         const do_ = document.createElement('div');
         do_.className = 'do';
         const button = document.createElement('button');
-        button.textContent = 'Read it again';
+        button.textContent = 'Read it';
         button.addEventListener('click', () => vscode.postMessage({ type: 'read', slug: source.slug }));
         do_.append(button);
         card.append(h, p, do_);
@@ -676,14 +892,13 @@ window.addEventListener('message', (event) => {
   const message = event.data;
   if (message.type === 'project') {
     render(message);
+    if (message.tab) { showTab(message.tab); }
     return;
   }
-  if (message.type === 'gone') {
-    document.body.replaceChildren();
-    const p = document.createElement('p');
-    p.className = 'empty';
-    p.textContent = 'This project is not in the Library any more.';
-    document.body.append(p);
+  if (message.type === 'picked') {
+    // A folder or an archive picked in the OS dialog is added straight away: the dialog already said yes.
+    vscode.postMessage({ type: 'addSourceSubmit', kind: message.kind, name: message.name, path: message.path });
+    return;
   }
 });
 

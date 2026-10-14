@@ -15,41 +15,258 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { Catalog, CatalogUnavailable, PageInput } from './catalog/store';
 import { slugOf } from './projectPage';
+import { Selection } from './selected';
 import { fileColumn } from './surface';
+import { rowSlug } from './views';
 
 const REGISTRY_TAIL = ['docs', 'help', 'registry.json'];
 const TOKEN_SECRET = 'temcoKnowledge.githubToken';
 
 export function registerReadCommands(
   context: vscode.ExtensionContext,
+  selection: Selection,
   output: vscode.OutputChannel,
   refresh: () => void
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('temcoKnowledge.readSource', (slug?: string) =>
-      readSource(context, output, refresh, slug)
+    vscode.commands.registerCommand('temcoKnowledge.readSource', (target?: unknown) =>
+      readSource(context, output, refresh, rowSlug(target))
     ),
-    vscode.commands.registerCommand('temcoKnowledge.openFile', (target?: string) => openFile(target)),
+    vscode.commands.registerCommand('temcoKnowledge.readAllSources', (target?: unknown) =>
+      readAllSources(context, output, refresh, rowSlug(target))
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.removeSource', (target?: unknown) =>
+      removeSource(context, refresh, rowSlug(target))
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.revealSource', (target?: unknown) =>
+      revealSource(context, rowSlug(target))
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.setSourceBranch', (target?: unknown) =>
+      setSourceBranch(context, refresh, rowSlug(target))
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.openFile', (target?: unknown) =>
+      openFile(selection, target)
+    ),
     vscode.commands.registerCommand('temcoKnowledge.setToken', () => setToken(context, refresh))
   );
 }
 
 /**
- * Open a file the catalog knows about.
+ * Reads every source that has never been read, one after another.
+ *
+ * One at a time on purpose: two reads at once would interleave in the output channel, and a host that rate
+ * limits one caller is asked twice as often for no gain. Each read reports itself quietly, and this says what
+ * happened once at the end.
+ */
+async function readAllSources(
+  context: vscode.ExtensionContext,
+  output: vscode.OutputChannel,
+  refresh: () => void,
+  /** A project's slug: read only what *it* cites. Nothing means every source that has never been read. */
+  project?: string
+): Promise<void> {
+  const catalog = await open(context);
+  if (!catalog) {
+    return;
+  }
+
+  let wanted: { slug: string; name: string }[] = [];
+  try {
+    const rows = catalog.sources();
+    const cited =
+      project === undefined
+        ? undefined
+        : new Set(catalog.document(slugOf(project))?.sources.map((source) => source.name) ?? []);
+
+    wanted = rows
+      .filter((source) => source.pages === undefined && (cited === undefined || cited.has(source.name)))
+      .map((source) => ({ slug: source.slug, name: source.name }));
+  } finally {
+    catalog.close();
+  }
+
+  if (wanted.length === 0) {
+    void vscode.window.showInformationMessage(
+      project === undefined
+        ? 'Temco Knowledge: every source has been read already.'
+        : 'Temco Knowledge: every source of this project has been read already.'
+    );
+    return;
+  }
+
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: 'Temco Knowledge: reading sources' },
+    async (progress) => {
+      for (const [index, source] of wanted.entries()) {
+        progress.report({ message: `${source.name} (${index + 1} of ${wanted.length})` });
+        await readSource(context, output, refresh, source.slug, true);
+      }
+    }
+  );
+
+  output.show(true);
+  void vscode.window.showInformationMessage(
+    `Temco Knowledge: read ${wanted.length} source${wanted.length === 1 ? '' : 's'} — see the output for what each one held.`
+  );
+}
+
+/** Forgets one source. Its pages, its scans and the projects citing it lose it with it — nothing is written to the source itself. */
+async function removeSource(
+  context: vscode.ExtensionContext,
+  refresh: () => void,
+  wanted?: string
+): Promise<void> {
+  const catalog = await open(context);
+  if (!catalog) {
+    return;
+  }
+
+  let target: { slug: string; name: string } | undefined;
+  try {
+    const sources = catalog.sources();
+    if (sources.length === 0) {
+      void vscode.window.showInformationMessage('Temco Knowledge: no sources are recorded.');
+      return;
+    }
+
+    if (wanted !== undefined) {
+      const row = sources.find((source) => source.slug === slugOf(wanted));
+      target = row ? { slug: row.slug, name: row.name } : undefined;
+    } else {
+      const picked = await vscode.window.showQuickPick(
+        sources.map((row) => ({
+          label: row.name,
+          detail: [row.kind, row.branch].filter(Boolean).join(' · '),
+          slug: row.slug,
+          name: row.name,
+        })),
+        { title: 'Forget which source?' }
+      );
+      target = picked ? { slug: picked.slug, name: picked.name } : undefined;
+    }
+    if (!target) {
+      return;
+    }
+
+    const answer = await vscode.window.showWarningMessage(
+      `Forget “${target.name}”?`,
+      {
+        modal: true,
+        detail:
+          'The catalog forgets this source, the pages it was found to hold, and which projects cite it. ' +
+          'Nothing is deleted or changed at the source itself.',
+      },
+      'Forget it'
+    );
+    if (answer !== 'Forget it') {
+      return;
+    }
+    catalog.removeSource(target.slug);
+  } finally {
+    catalog.close();
+  }
+  refresh();
+}
+
+/** Opens what a source actually is: the folder in the OS, or the repository in the browser. */
+async function revealSource(context: vscode.ExtensionContext, wanted?: string): Promise<void> {
+  const catalog = await open(context);
+  if (!catalog) {
+    return;
+  }
+  try {
+    const row = wanted !== undefined ? catalog.sources().find((source) => source.slug === slugOf(wanted)) : undefined;
+    const source = row ? catalog.source(row.slug) : undefined;
+    if (!source) {
+      return;
+    }
+    if (source.path !== undefined) {
+      await vscode.env.openExternal(vscode.Uri.file(source.path));
+      return;
+    }
+    if (source.remoteUrl !== undefined) {
+      await vscode.env.openExternal(vscode.Uri.parse(source.remoteUrl.replace(/\.git$/, '')));
+      return;
+    }
+    void vscode.window.showInformationMessage(`Temco Knowledge: ${source.name} has nothing to open.`);
+  } finally {
+    catalog.close();
+  }
+}
+
+/**
+ * Sets the branch a source is read at.
+ *
+ * A branch is the one thing about a source that changes which pages exist — the registry may be on one branch
+ * and not on another — so it is settable from the row, and the next read uses it.
+ */
+async function setSourceBranch(
+  context: vscode.ExtensionContext,
+  refresh: () => void,
+  wanted?: string
+): Promise<void> {
+  const catalog = await open(context);
+  if (!catalog) {
+    return;
+  }
+  try {
+    const row = wanted !== undefined ? catalog.sources().find((source) => source.slug === slugOf(wanted)) : undefined;
+    const source = row ? catalog.source(row.slug) : undefined;
+    if (!row || !source) {
+      return;
+    }
+    if (source.kind !== 'git') {
+      void vscode.window.showInformationMessage('Temco Knowledge: only a repository is read at a branch.');
+      return;
+    }
+    const entered = await vscode.window.showInputBox({
+      title: `Temco Knowledge: the branch to read ${source.name} at`,
+      prompt: 'Leave empty to use the repository’s default branch.',
+      value: source.branch ?? '',
+      ignoreFocusOut: true,
+    });
+    if (entered === undefined) {
+      return;
+    }
+    catalog.setSourceBranch(row.slug, entered.trim() || undefined);
+  } finally {
+    catalog.close();
+  }
+  refresh();
+}
+
+/**
+ * Open a file the catalog knows about, and remember which page of the project it was.
  *
  * A page read from a repository over the API has no local file, so this says where it came from instead of
  * failing to open something that was never downloaded.
  */
-async function openFile(target?: string): Promise<void> {
-  if (!target) {
+async function openFile(selection: Selection, target?: unknown): Promise<void> {
+  const path = typeof target === 'string' ? target : (target as { path?: string } | undefined)?.path;
+  if (path === undefined || path.length === 0) {
     return;
   }
+
+  // Remembered so the AI (and the hub) can be about the page you were on, with no text editor open.
+  const project = selection.project();
+  if (project !== undefined && typeof target === 'object' && target !== null) {
+    const page = target as { id?: unknown; title?: unknown };
+    if (typeof page.id === 'string') {
+      await selection.rememberPage({
+        project,
+        id: page.id,
+        title: typeof page.title === 'string' ? page.title : page.id,
+        path,
+      });
+    }
+  }
+
   try {
-    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(target));
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(path));
     await vscode.window.showTextDocument(document, { preview: false, viewColumn: fileColumn() });
   } catch {
     void vscode.window.showInformationMessage(
-      `Temco Knowledge: ${target} is not on this machine — pages read over the API are recorded, not downloaded.`
+      `Temco Knowledge: ${path} is not on this machine — pages read over the API are recorded, not downloaded.`
     );
   }
 }
@@ -58,7 +275,9 @@ async function readSource(
   context: vscode.ExtensionContext,
   output: vscode.OutputChannel,
   refresh: () => void,
-  wanted?: string
+  wanted?: string,
+  /** True when a batch is reading: the batch reports once, rather than one notice per source. */
+  quiet = false
 ): Promise<void> {
   const catalog = await open(context);
   if (!catalog) {
@@ -124,9 +343,11 @@ async function readSource(
     output.show(true);
     refresh();
 
-    void vscode.window.showInformationMessage(
-      `Temco Knowledge: ${source.name} — ${found.note ?? `${found.pages.length} pages read`}.`
-    );
+    if (!quiet) {
+      void vscode.window.showInformationMessage(
+        `Temco Knowledge: ${source.name} — ${found.note ?? `${found.pages.length} pages read`}.`
+      );
+    }
   } catch (error) {
     void vscode.window.showErrorMessage(`Temco Knowledge: ${String(error)}`);
   } finally {

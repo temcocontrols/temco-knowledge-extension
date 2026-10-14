@@ -217,6 +217,50 @@ repository, no branch and no product name, and it reads whatever the catalog and
                                               └──────────────────────┘
 ```
 
+### The project flow, as built 2026-10-14
+
+The flow was reworked after the first attempt at it was judged — correctly — not good: a project's pages existed
+in two places with two truths, a source could not be acted on from the row that named it, and *Add a source* threw
+the whole edit form at you. What changed, in the order it matters:
+
+```
+  selected project ──────────► the Workspace view, the counts, the faults, the AI
+        │                       (one world: the view follows the project, not the open folder)
+        ├── Library row  ⚙ Read · Open the source · Set the branch · Forget     (actions on the row)
+        ├── hub          Read every source · Add a source · Build · Edit        (the work, on one page)
+        └── hub ▸ Sources  the add form lives here — a source is one decision, not the whole project
+```
+
+| # | What it was | What it is |
+|---|---|---|
+| **A** | the Workspace view showed the open folders; a project's pages lived in the catalog, beside it | **one world**: with a project being worked on, the view shows *that project's* sources — a local folder gets the full checks even when the window has it closed, and a source that is not here shows what the read recorded, marked `origin: 'catalog'` so nothing unchecked looks checked |
+| **B** | a Library row was text; reading was only on the view's title bar | rows carry a context value — **Read · Open the source · Set the branch · Forget** on a source, **Work on · Edit · Add a source · Build** on a project |
+| **C** | *Read the sources* read **one** source and said "sources" | **Read every source** reads them all, one at a time (a rate-limited host is not asked twice at once), with one progress notice and one report |
+| **D** | *Add a source* opened the whole edit form | the add form is on the hub's **Sources** tab: repository + branch, or a folder, or an archive |
+| **E** | a build ran only the output script | a build runs the repository's own **`docs:registry`** first when it has one — that is what writes the index, the headings and the stale verdict — then the output script, and says which of the two it ran |
+| **F** | the AI answered about the open folder only, and said nothing about what it was answering | the panel is **about the project**: it names it, and when no editor is in front it falls back to the page the project remembers you were on |
+
+**The projects page** (`src/projectsPage.ts`) is the list of what this application manages, and the Library's
+*Projects* row opens it. Each card carries what a project is made of and what can be done with it — the four
+technical facts are on the card, so nothing has to be opened to decide: version · owner · outputs; its sources
+with how many pages each holds and how it was read; how many pages, how many without an owner, how many
+artifacts and when the last one was built; and the operations — *Work on it* · *Open* · *Read sources* ·
+*Build* · *Edit* · *Remove…*. The one being worked on is first and marked, because this page is read top-down.
+
+**A page for a project that has been removed closes itself, and the projects page takes its place.** The first
+version kept the tab and put a notice in it — which was wrong twice over. It cleared `document.body`, taking the
+tabs, the actions and every element the next render writes into with it, so the tab could never become another
+project's page; and it left a page *about nothing*, with working-looking buttons on it. A tab for something that
+no longer exists is worse than no tab: the removal says so in one message, closes that page, and opens the list
+of what is left. Removal from any surface does this, and a page opened for a project that is not there does the
+same thing rather than rendering.
+
+The selection is state, in one place (`src/selected.ts`, in `workspaceState`): which project, and which page
+of it you were last on. A project belongs to the window, not the machine — two windows on two products must not
+answer about each other's pages. Opening a project makes it the one being worked on, and the library row, the
+view's description and the dashboard all say so; a project that is removed while selected clears the selection
+rather than leaving a view about something that is not there.
+
 ### The window
 
 **As built, 2026-10-14.** The figures below are the design; what exists is these same surfaces with different
@@ -227,10 +271,13 @@ names, and the difference is recorded here rather than left to be discovered:
   projects, the sources with their pages beneath them, and the catalog's own state).
 - The unit is called a **project** in everything a person reads. The catalog's table is still `documents`; a
   project is what that row is, and renaming the table buys nothing but a migration.
-- **Two pages, two jobs.** The **hub** (`src/projectHub.ts`) is what a project *is* — Overview · Pages · Sources
-  · AI · Builds, with Read and Build at the top. The **edit page** (`src/projectPage.ts`) is what it is *made
-  of*. Opening the editor for every look at a project would make reading its pages and editing its fields the
-  same act, so they are separate commands (`openProject` and `editProject`).
+- **Five pages, one job each.** The **projects page** (`src/projectsPage.ts`) is the list — every project, what it
+  is made of, and its operations; the Library's *Projects* row opens it. The **hub** (`src/projectHub.ts`) is what
+  one project *is* — Overview · Pages · Sources · AI · Builds, with Read and Build at the top. The **edit page**
+  (`src/projectPage.ts`) is what it is *made of*. Opening the editor for every look at a project would make
+  reading its pages and editing its fields the same act, so they are separate commands (`openProject` and
+  `editProject`). The **dashboard** (`src/home.ts`) is the application itself, and the **AI page**
+  (`src/aiPage.ts`) is the AI. All five are tabs in one group.
 - **Our pages are tabs in one group**, and so are the documentation pages they open — never a split. The rule
   lives in `src/surface.ts` and is stated there once, together with the two wrong answers that led to it: a page
   opened `Beside` produced a second column a few hundred pixels wide, and "is the tab in front one of ours?" —

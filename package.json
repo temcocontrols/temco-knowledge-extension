@@ -174,6 +174,46 @@
         "icon": "$(tools)"
       },
       {
+        "command": "temcoKnowledge.openProjects",
+        "title": "Projects",
+        "icon": "$(list-flat)"
+      },
+      {
+        "command": "temcoKnowledge.removeProject",
+        "title": "Remove the Project",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "temcoKnowledge.selectProject",
+        "title": "Work on a Project",
+        "icon": "$(pass-filled)"
+      },
+      {
+        "command": "temcoKnowledge.clearProject",
+        "title": "Stop Working on a Project",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "temcoKnowledge.readAllSources",
+        "title": "Read Every Unread Source",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "temcoKnowledge.revealSource",
+        "title": "Open the Source",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "temcoKnowledge.setSourceBranch",
+        "title": "Set the Branch to Read",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "temcoKnowledge.removeSource",
+        "title": "Forget the Source",
+        "icon": "$(trash)"
+      },
+      {
         "command": "temcoKnowledge.aiPage",
         "title": "The AI",
         "icon": "$(hubot)"
@@ -241,9 +281,24 @@
           "group": "navigation@4"
         },
         {
-          "command": "temcoKnowledge.buildProject",
+          "command": "temcoKnowledge.readAllSources",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@5"
+        },
+        {
+          "command": "temcoKnowledge.selectProject",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@6"
+        },
+        {
+          "command": "temcoKnowledge.buildProject",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@7"
+        },
+        {
+          "command": "temcoKnowledge.openProjects",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@8"
         },
         {
           "command": "temcoKnowledge.aiPage",
@@ -265,14 +320,67 @@
         {
           "command": "temcoKnowledge.openRegistry",
           "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|chapter|folder)$/",
+          "group": "1_open@2"        },
+        {
+          "command": "temcoKnowledge.openProject",
+          "when": "view == temcoKnowledge.library && viewItem == project",
+          "group": "inline"
+        },
+        {
+          "command": "temcoKnowledge.readSource",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "inline"
+        },
+        {
+          "command": "temcoKnowledge.openFile",
+          "when": "view == temcoKnowledge.library && viewItem == page",
+          "group": "inline"
+        },
+        {
+          "command": "temcoKnowledge.selectProject",
+          "when": "view == temcoKnowledge.library && viewItem == project",
+          "group": "1_work@1"
+        },
+        {
+          "command": "temcoKnowledge.editProject",
+          "when": "view == temcoKnowledge.library && viewItem == project",
+          "group": "1_work@2"
+        },
+        {
+          "command": "temcoKnowledge.addSource",
+          "when": "view == temcoKnowledge.library && viewItem == project",
+          "group": "1_work@3"
+        },
+        {
+          "command": "temcoKnowledge.buildProject",
+          "when": "view == temcoKnowledge.library && viewItem == project",
+          "group": "1_work@4"
+        },
+        {
+          "command": "temcoKnowledge.removeProject",
+          "when": "view == temcoKnowledge.library && viewItem == project",
+          "group": "9_forget@1"
+        },
+        {
+          "command": "temcoKnowledge.revealSource",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "1_open@1"
+        },
+        {
+          "command": "temcoKnowledge.setSourceBranch",
+          "when": "view == temcoKnowledge.library && viewItem == source",
           "group": "1_open@2"
-        }
+        },
+        {
+          "command": "temcoKnowledge.removeSource",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "9_forget@1"        }
       ]
     },
     "viewsWelcome": [
       {
         "view": "temcoKnowledge.pages",
-        "contents": "No documentation folder is open.\n\nThe pages, the faults and the totals of any project you open here appear beside the code they document."
+        "contents": "No documentation is being read yet.\n\nWork on a project — or open a folder that holds one — and its pages, its faults and its totals appear here beside the code they document."
       },
       {
         "view": "temcoKnowledge.work",

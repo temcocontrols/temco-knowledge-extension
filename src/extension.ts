@@ -9,6 +9,7 @@ import { registerAiCommands } from './ai/commands';
 import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
 import { registerBuildCommands } from './builds';
+import { Catalog } from './catalog/store';
 import { registerCatalogCommands } from './catalog/commands';
 import { publishDiagnostics } from './diagnostics';
 import { registerFeedbackCommands } from './feedback';
@@ -18,8 +19,9 @@ import { registerProjectBuildCommands } from './projectBuild';
 import { registerReadCommands } from './read';
 import { registerReportCommands } from './report';
 import { registerScaffoldCommands } from './scaffold';
+import { Selection } from './selected';
 import { fileColumn } from './surface';
-import { DocsRoot, RegistryError, collectPages, countStale, loadDocsRoot, registryUriFor, totals } from './registry';
+import { DocsRoot, DeclaredPage, RegistryError, collectPages, countStale, folderForPath, loadDocsRoot, registryUriFor, rootFromDeclared, totals } from './registry';
 import { KnowledgeNode, KnowledgeTreeProvider, pageFromNode } from './tree';
 import { registerSectionViews } from './views';
 
@@ -35,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const output = vscode.window.createOutputChannel(OUTPUT_NAME);
   const diagnostics = vscode.languages.createDiagnosticCollection('temcoKnowledge');
   const provider = new KnowledgeTreeProvider();
+  const selection = new Selection(context);
 
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
@@ -48,7 +51,7 @@ export function activate(context: vscode.ExtensionContext): void {
   let roots: DocsRoot[] = [];
 
   // The AI panel reads the page and the registry through the same model the tree does; it decides nothing.
-  const panel = new AiPanel(context, () => roots);
+  const panel = new AiPanel(context, () => roots, selection);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(AI_VIEW_ID, panel, {
       webviewOptions: { retainContextWhenHidden: true },
@@ -57,20 +60,51 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // The home page: the platform's own entry point, and the one surface that is not about a folder.
-  const home = new HomePanel(context, () => roots);
+  const home = new HomePanel(context, selection, () => roots);
 
   // The other two sections of the sidebar: what needs doing, and what it reads and produces.
-  const sections = registerSectionViews(context, () => roots);
+  const sections = registerSectionViews(context, selection, () => roots);
 
   const refresh = async (): Promise<void> => {
     const broken: BrokenRegistry[] = [];
     roots = [];
 
-    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    // **One world.** With a project selected, the project decides what is read: each of its sources, whether or
+    // not the folder is open in this window, and what a read recorded for the ones that are not here at all.
+    // With no project selected, the open folders are read, exactly as before.
+    const selected = selection.project();
+    const read: { folder: vscode.WorkspaceFolder; source?: ReadableSource }[] = [];
+    const recorded: DocsRoot[] = [];
+    let projectName: string | undefined;
+
+    if (selected === undefined) {
+      read.push(...(vscode.workspace.workspaceFolders ?? []).map((folder) => ({ folder })));
+    } else {
+      const project = await projectSources(context, selected);
+      if (project.missing) {
+        // The project was removed while it was the one being worked on. Clear the selection and let the next
+        // run read the open folders, rather than showing a view about something that is not there.
+        await selection.select(undefined);
+        return;
+      }
+      projectName = project.name;
+      for (const source of project.sources) {
+        if (source.path !== undefined) {
+          read.push({ folder: folderForPath(source.path, source.name), source });
+        } else if (source.pages.length > 0) {
+          recorded.push(rootFromDeclared(source.name, source.pages));
+        }
+      }
+    }
+
+    for (const { folder, source } of read) {
       try {
         const root = await loadDocsRoot(folder);
         if (root) {
           roots.push(root);
+        } else if (source !== undefined && source.pages.length > 0) {
+          // A source with no registry is not a hole: what the read recorded is what the view shows.
+          recorded.push(rootFromDeclared(source.name, source.pages));
         }
       } catch (error) {
         broken.push({
@@ -79,8 +113,14 @@ export function activate(context: vscode.ExtensionContext): void {
         });
       }
     }
+    roots.push(...recorded);
 
     provider.setRoots(roots);
+    // The view says which project it is showing, because with a project selected it is no longer about the
+    // window's folders — and a view that silently answers a different question is worse than an empty one.
+    treeView.description = projectName
+      ? `${projectName} · ${totals(roots).pages} pages`
+      : undefined;
     publishDiagnostics(diagnostics, roots);
     for (const { uri, message } of broken) {
       diagnostics.set(uri, [
@@ -173,6 +213,16 @@ export function activate(context: vscode.ExtensionContext): void {
         preview: false,
         viewColumn: fileColumn(),
       });
+      // The page you were on is what the AI answers about when no editor is in front.
+      const project = selection.project();
+      if (project !== undefined && page.page.uri.scheme === 'file') {
+        await selection.rememberPage({
+          project,
+          id: page.page.id,
+          title: page.page.title,
+          path: page.page.uri.fsPath,
+        });
+      }
     }),
 
     vscode.commands.registerCommand('temcoKnowledge.revealPage', async (node?: KnowledgeNode) => {
@@ -208,9 +258,12 @@ export function activate(context: vscode.ExtensionContext): void {
   registerScaffoldCommands(context);
   registerFeedbackCommands(context, () => roots);
   registerCatalogCommands(context, output);
-  registerProjectCommands(context, () => void refresh());
+  registerProjectCommands(context, selection, () => void refresh());
   registerProjectBuildCommands(context, output);
-  registerReadCommands(context, output, () => void refresh());
+  registerReadCommands(context, selection, output, () => void refresh());
+
+  // The selected project is what everything reads, so a change to it re-reads everything.
+  context.subscriptions.push(selection.onDidChange(() => void refresh()));
 
   // Opening the extension shows the platform's home page — it is the first thing a person should see. It can
   // be turned off, because it opens a tab, and a tab is not always wanted.
@@ -224,6 +277,63 @@ export function activate(context: vscode.ExtensionContext): void {
 export function deactivate(): void {
   // The local AI may have left a server process running; nothing else is holding anything open.
   disposeAi();
+}
+
+/** One source of a project, in the two shapes the Workspace view can read: a folder path, or recorded pages. */
+interface ReadableSource {
+  slug: string;
+  name: string;
+  path?: string;
+  pages: DeclaredPage[];
+}
+
+/**
+ * What the selected project is made of, as the Workspace view needs it.
+ *
+ * One catalog open for the whole question, then closed: the pages are read here and carried by the tree's nodes,
+ * so expanding a source later never goes back to the database. A catalog that cannot be opened returns nothing
+ * rather than throwing — it is reported where it is used (the Library, a read), not by an empty tree.
+ */
+async function projectSources(
+  context: vscode.ExtensionContext,
+  slug: string
+): Promise<{ name: string; sources: ReadableSource[]; missing: boolean }> {
+  let catalog: Catalog | undefined;
+  try {
+    catalog = await Catalog.open(context);
+  } catch {
+    return { name: slug, sources: [], missing: false };
+  }
+
+  try {
+    const detail = catalog.document(slug);
+    if (!detail) {
+      return { name: slug, sources: [], missing: true };
+    }
+    const cited = new Set(detail.sources.map((source) => source.name));
+    const sources: ReadableSource[] = [];
+
+    for (const row of catalog.sources()) {
+      if (!cited.has(row.name)) {
+        continue;
+      }
+      const source = catalog.source(row.slug);
+      if (!source) {
+        continue;
+      }
+      sources.push({
+        slug: row.slug,
+        name: source.name,
+        path: source.path,
+        pages: catalog
+          .pagesFor(source.id)
+          .map((page) => ({ id: page.id, title: page.title, owner: page.owner })),
+      });
+    }
+    return { name: detail.name, sources, missing: false };
+  } finally {
+    catalog.close();
+  }
 }
 
 /** A new page starts as a title and nothing else — the structure lives in the registry, not in front matter. */
