@@ -15,7 +15,7 @@ import { aiStatus, showAiLog, startAiServer, stopAiServer } from './ai/runtime';
 import { AI_PAGE_VIEW_TYPE, pageColumn } from './surface';
 
 interface AiPageMessage {
-  type: 'ready' | 'download' | 'remove' | 'start' | 'stop' | 'folder' | 'log' | 'models' | 'apply';
+  type: 'ready' | 'download' | 'remove' | 'start' | 'stop' | 'folder' | 'log' | 'models' | 'apply' | 'panel' | 'dock';
   id?: string;
   model?: string;
   runtime?: string;
@@ -85,6 +85,12 @@ export class AiPage {
         return;
       case 'log':
         showAiLog();
+        return;
+      case 'panel':
+        await vscode.commands.executeCommand('temcoKnowledge.ai.focus');
+        return;
+      case 'dock':
+        await vscode.commands.executeCommand('temcoKnowledge.aiDockRight');
         return;
       case 'models':
         await vscode.commands.executeCommand('temcoKnowledge.models');
@@ -219,6 +225,8 @@ function html(script: string): string {
     button.primary:hover { background: var(--vscode-button-hoverBackground); }
     button:disabled { opacity: .5; cursor: default; }
     .actions { display: flex; gap: .6em; flex-wrap: wrap; margin: .8em 0 0; }
+    .place { display: flex; gap: .6em; flex-wrap: wrap; margin: .8em 0 0; align-items: center; }
+    .place p { margin: 0; color: var(--vscode-descriptionForeground); flex: 1 1 20em; min-width: 0; }
     .card { border: 1px solid var(--vscode-panel-border); border-radius: 3px; padding: .8em 1em;
             margin: 0 0 .7em; max-width: 70em; display: flex; gap: 1em; align-items: flex-start; }
     .card .body { flex: 1 1 auto; min-width: 0; }
@@ -258,6 +266,15 @@ function html(script: string): string {
   <dl class="facts" id="facts"></dl>
   <div class="actions" id="controls"></div>
 
+  <h2>Where the AI sits</h2>
+  <div class="place">
+    <p>The panel belongs in the right side bar, beside the page you are reading — and that is where it is
+      <em>declared</em> (<code>contributes.viewsContainers.secondarySidebar</code>), so it opens there without
+      anything to set up. Drag it anywhere you like; this puts it back where it belongs.</p>
+    <button class="primary" id="dock">Put it back in the right side bar</button>
+    <button id="panel">Show the panel</button>
+  </div>
+
   <h2>Which runtime and model</h2>
   <p class="meta">Installing something and choosing it are two separate acts — the choice below is what the
     server actually starts with.</p>
@@ -280,6 +297,10 @@ function html(script: string): string {
 const vscode = acquireVsCodeApi();
 const $ = (id) => document.getElementById(id);
 let selection = { runtime: '', model: '' };
+
+// The two static buttons above the lists: the panel itself, and the one-time move to the right side bar.
+$('dock').addEventListener('click', () => vscode.postMessage({ type: 'dock' }));
+$('panel').addEventListener('click', () => vscode.postMessage({ type: 'panel' }));
 
 function fact(label, value) {
   const div = document.createElement('div');

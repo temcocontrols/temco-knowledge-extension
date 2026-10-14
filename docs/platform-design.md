@@ -347,13 +347,14 @@ names, and the difference is recorded here rather than left to be discovered:
 **The AI goes on the right**, beside the page being worked on — that is where `app-layout.md`'s mock puts it,
 and it is where a reader of a page wants a question answered.
 
-**Honest note on that position:** VS Code has no contribution point that *places* a container on the right —
-`contributes.viewsContainers` accepts `activitybar` and `panel` only. So the AI view is contributed to the
-panel container and **docked on the right by the workbench**: the secondary side bar accepts any view, the
-position is remembered, and a fresh install needs one drag. If it must open on the right by itself, the
-alternative is an **editor-area webview panel opened beside the page** (`ViewColumn.Beside`) — a different
-lifecycle (a tab, not a dock) and the design's phase-3 web editor is already that shape. Recorded here as a
-real choice rather than a silent preference.
+**The AI sits in the right side bar, and that is a declaration, not a preference.** The container is contributed
+under **`contributes.viewsContainers.secondarySidebar`** — a location VS Code's own schema has, and which this
+design document wrongly claimed did not exist. The secondary side bar is therefore its default home: nothing to
+drag, nothing to pick, no setup step. If someone moves it (the panel, the primary side bar), *Show the AI in the
+right side bar* (`temcoKnowledge.aiDockRight`) focuses the view and invokes the per-container
+`<containerId>.resetViewContainerLocation` command VS Code registers, which returns it to its declared location.
+That is also why the extension never asks *where* a view currently is: the view-location API is not exposed to
+extensions, and the reset command makes the question unnecessary.
 
 ### Documents — the home page
 

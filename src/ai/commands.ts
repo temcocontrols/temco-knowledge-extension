@@ -28,8 +28,35 @@ export function registerAiCommands(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('temcoKnowledge.openModelFolder', async () => {
       await vscode.env.openExternal(vscode.Uri.file(modelRoot(context)));
     }),
+    vscode.commands.registerCommand('temcoKnowledge.aiDockRight', () => dockRight()),
     vscode.commands.registerCommand('temcoKnowledge.aiStatus', () => showAiStatus(context))
   );
+}
+
+/** The view id the AI is contributed under — the argument VS Code's own move-view command wants. */
+const AI_VIEW = 'temcoKnowledge.ai';
+/** The contributed container, as VS Code names it: every contributed container is prefixed this way. */
+const AI_CONTAINER = 'workbench.view.extension.temcoKnowledgePanel';
+
+/**
+ * Shows the AI in the right side bar — which is where it is *declared*, so this is also the repair.
+ *
+ * The container is contributed under `viewsContainers.secondarySidebar`, so the secondary side bar is its
+ * default location and a fresh install needs nothing at all. If someone has since dragged it to the panel or
+ * the primary side bar, VS Code registers a **reset-location** command per container
+ * (`<containerId>.resetViewContainerLocation`) that puts it back where it is declared — no picker, no drag, and
+ * no guessing at where a view currently lives, which the extension API does not expose.
+ */
+async function dockRight(): Promise<void> {
+  await vscode.commands.executeCommand(`${AI_VIEW}.focus`);
+  try {
+    await vscode.commands.executeCommand(`${AI_CONTAINER}.resetViewContainerLocation`);
+  } catch (error) {
+    void vscode.window.showWarningMessage(
+      'Temco Knowledge: this VS Code build would not reset the container location. Drag the “Temco Knowledge” ' +
+        `tab to the right side bar instead — it is the same move. (${String(error)})`
+    );
+  }
 }
 
 /** One place to see which runtime and model are in use, and whether the server is up. */

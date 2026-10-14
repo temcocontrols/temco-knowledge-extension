@@ -99,43 +99,40 @@ class SectionView implements vscode.TreeDataProvider<Row> {
    * The AI, as one row at the end of the Library.
    *
    * It was reachable only from the command palette and from the panel's own title bar — which you cannot see
-   * when the panel is closed, which is exactly when you want it. The description carries the two facts that
-   * decide whether it can answer at all: which model, and whether the server is up.
+   * when the panel is closed, which is exactly when you want it. The description carries the one fact that
+   * decides whether it can answer at all: which model, and whether the server is up.
+   *
+   * Two children and no prose. The panel is the reason the row exists; the page is where everything else lives
+   * — the model list, the folder, the dock link — so a second copy of each here is only noise.
    */
   private aiRow(): Row {
     const status = aiStatus(this.context);
     const model = status.model ? entryById(status.model.id)?.label ?? status.model.id : undefined;
     const line = status.running
-      ? `${model ?? 'no model chosen'} · running on ${status.running.baseUrl}`
+      ? `${model ?? 'no model chosen'} · running`
       : model !== undefined
         ? `${model} · stopped`
         : status.runtime !== undefined
-          ? 'no model yet — the AI page lists what can be downloaded'
-          : 'nothing installed — the AI page lists what can be downloaded';
+          ? 'no model chosen'
+          : 'nothing installed';
 
     return new Row(
       'The AI',
       line,
       'hubot',
       [
-        new Row('Open the panel', 'the AI beside the page you are reading', 'comment-discussion', [], {
+        new Row('Open the panel', '', 'comment-discussion', [], {
           command: 'temcoKnowledge.ai.focus',
           args: [],
         }),
-        new Row('The AI page — runtime · model · prompts', 'download, choose, start, stop', 'settings-gear', [], {
+        new Row('The AI page', '', 'settings-gear', [], {
           command: 'temcoKnowledge.aiPage',
           args: [],
         }),
-        new Row('Models and Runtime…', 'the same list, for a keyboard user', 'list-selection', [], {
-          command: 'temcoKnowledge.models',
-          args: [],
-        }),
-        new Row('Open the model folder', 'where the downloads live — never in a repository', 'folder-opened', [], {
-          command: 'temcoKnowledge.openModelFolder',
-          args: [],
-        }),
       ],
-      { command: 'temcoKnowledge.ai.focus', args: [] },
+      // Clicking the row opens the AI *page*, not the panel: the page is where the AI is set up, it says whether
+      // a model is installed at all, and it is the one surface that can explain itself when nothing is.
+      { command: 'temcoKnowledge.aiPage', args: [] },
       'ai'
     );
   }

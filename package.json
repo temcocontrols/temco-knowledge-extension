@@ -33,7 +33,7 @@
           "icon": "media/knowledge.svg"
         }
       ],
-      "panel": [
+      "secondarySidebar": [
         {
           "id": "temcoKnowledgePanel",
           "title": "Temco Knowledge",
@@ -109,6 +109,11 @@
         "command": "temcoKnowledge.openModelFolder",
         "title": "Open Model Folder",
         "icon": "$(file-directory)"
+      },
+      {
+        "command": "temcoKnowledge.aiDockRight",
+        "title": "Show the AI in the Right Side Bar",
+        "icon": "$(layout-sidebar-right)"
       },
       {
         "command": "temcoKnowledge.aiStatus",
@@ -405,6 +410,11 @@
           "command": "temcoKnowledge.aiPage",
           "when": "view == temcoKnowledge.library && viewItem == ai",
           "group": "1_open@1"
+        },
+        {
+          "command": "temcoKnowledge.aiDockRight",
+          "when": "view == temcoKnowledge.library && viewItem == ai",
+          "group": "1_place@1"
         },
         {
           "command": "temcoKnowledge.aiStatus",
