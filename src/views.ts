@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import { Catalog } from './catalog/store';
+import { slugOf } from './projectPage';
 import { DocsRoot, collectPages, countStale } from './registry';
 
 export const WORK_VIEW_ID = 'temcoKnowledge.work';
@@ -16,7 +17,9 @@ class Row {
     readonly label: string,
     readonly description: string,
     readonly icon: string,
-    readonly children: Row[] = []
+    readonly children: Row[] = [],
+    /** What clicking the row does. Only rows that stand for something openable have one. */
+    readonly command?: { command: string; args: unknown[] }
   ) {}
 }
 
@@ -44,6 +47,9 @@ class SectionView implements vscode.TreeDataProvider<Row> {
     item.description = row.description;
     item.iconPath = new vscode.ThemeIcon(row.icon);
     item.tooltip = row.description ? `${row.label} — ${row.description}` : row.label;
+    if (row.command) {
+      item.command = { command: row.command.command, title: row.label, arguments: row.command.args };
+    }
     return item;
   }
 
@@ -131,10 +137,7 @@ class SectionView implements vscode.TreeDataProvider<Row> {
       const sources = catalog.sources();
 
       const documentRows = documents.map((document) => {
-        const slug = document.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+|-+$/g, '');
+        const slug = slugOf(document.name);
         const cited = catalog !== undefined ? catalog.documentSources(slug) : [];
         const artifacts = catalog !== undefined ? catalog.documentArtifacts(slug) : [];
 
@@ -172,26 +175,46 @@ class SectionView implements vscode.TreeDataProvider<Row> {
             .filter((part): part is string => Boolean(part))
             .join(' · '),
           'book',
-          children
+          children,
+          { command: 'temcoKnowledge.openProject', args: [slug] }
+        );
+      });
+
+      // A source expands into what the read recorded — the pages it declares, in the order it declared them.
+      // Never read yet means no children, and the row says so rather than pretending to be empty.
+      const sourceRows = sources.map((source) => {
+        const pages = catalog !== undefined ? catalog.pagesFor(source.id) : [];
+        return new Row(
+          source.name,
+          [
+            source.kind,
+            source.branch,
+            source.pages === undefined ? 'never read' : `${source.pages} pages`,
+            source.lastReadMode ? `read by ${source.lastReadMode}` : undefined,
+          ]
+            .filter((part): part is string => Boolean(part))
+            .join(' · '),
+          source.kind === 'git' ? 'git-branch' : 'file',
+          pages.map(
+            (page) =>
+              new Row(
+                page.title || page.id,
+                [page.id, page.owner].filter((part): part is string => Boolean(part)).join(' · '),
+                'markdown',
+                [],
+                page.path ? { command: 'temcoKnowledge.openFile', args: [page.path] } : undefined
+              )
+          )
         );
       });
 
       rows = [
-        new Row('Documents', documents.length === 0 ? 'none created yet' : String(documents.length), 'library', documentRows),
+        new Row('Projects', documents.length === 0 ? 'none created yet' : String(documents.length), 'library', documentRows),
         new Row(
           'Sources',
           sources.length === 0 ? 'none recorded yet' : String(sources.length),
           'repo',
-          sources.map(
-            (source) =>
-              new Row(
-                source.name,
-                [source.kind, source.branch, source.lastReadMode].
-                  filter((part): part is string => Boolean(part))
-                  .join(' · '),
-                source.kind === 'git' ? 'git-branch' : 'file'
-              )
-          )
+          sourceRows
         ),
         new Row(
           'Catalog',

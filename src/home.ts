@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 import { Catalog, CatalogUnavailable } from './catalog/store';
 import { DocsRoot, collectPages, countStale, totals } from './registry';
 
-export const HOME_VIEW_TYPE = 'temcoKnowledge.home';
+import { HOME_VIEW_TYPE, pageColumn } from './surface';
 
 interface Feature {
   name: string;
@@ -55,7 +55,7 @@ const FEATURES: Feature[] = [
     name: 'Projects',
     state: 'working',
     detail:
-      'Create a document — the project you manage and version — and give it sources: a repository at a branch you choose, a folder on this machine, or an archive.',
+      'Create a project — the thing you manage and version — and give it sources: a repository at a branch you choose, a folder on this machine, or an archive.',
   },
   {
     name: 'Start a Registry',
@@ -68,7 +68,7 @@ const FEATURES: Feature[] = [
 const STEPS: [string, string][] = [
   ['Read', 'a source where it lives — a repository at a branch you choose, a folder, an archive'],
   ['Remember', 'what it found goes into one local catalog: what exists, what changed, what is owed'],
-  ['Build', 'a document cites its sources, declares its outputs, and leaves an artifact: CHM, PDF, site'],
+  ['Build', 'a project cites its sources, declares its outputs, and leaves an artifact: CHM, PDF, site'],
   ['Review', 'the model drafts, a person approves — nothing is published on its own'],
 ];
 
@@ -83,11 +83,11 @@ export class HomePanel {
   /** Opens the page, or brings it forward if it is already open. One instance, always. */
   open(): void {
     if (this.panel) {
-      this.panel.reveal(vscode.ViewColumn.One);
+      this.panel.reveal(pageColumn());
       this.render();
       return;
     }
-    this.panel = vscode.window.createWebviewPanel(HOME_VIEW_TYPE, 'Temco Knowledge', vscode.ViewColumn.One, {
+    this.panel = vscode.window.createWebviewPanel(HOME_VIEW_TYPE, 'Temco Knowledge', pageColumn(), {
       enableScripts: false,
       localResourceRoots: [],
     });
@@ -230,9 +230,9 @@ export class HomePanel {
           <h2>How to start now <span class="count">nothing has to be built first</span></h2>
           <ol class="steps">
             <li><b>Create a project</b> —
-                <a href="command:temcoKnowledge.newDocument">Create a document</a>: name it, give it a version
+                <a href="command:temcoKnowledge.newProject">Create a project</a>: name it, give it a version
                 and an owner. This is the button marked <code>+</code> on the <b>Library</b> title bar, and it
-                is in the command palette as <i>Create a Document</i>.</li>
+                is in the command palette as <i>Create a Project</i>.</li>
             <li><b>Give it a source</b> —
                 <a href="command:temcoKnowledge.addSource">Add a source</a>: a repository at a branch you
                 choose, a folder on this machine, or an archive. The <code>+</code> beside it on the same title
@@ -275,7 +275,7 @@ function shell(body: string): string {
     li { margin: .3em 0; }
     a { color: var(--vscode-textLink-foreground); text-decoration: none; }
     a:hover { color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
-    code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
+    code { font-family: var(--vscode-editor-font-family); font-size: .95em; overflow-wrap: anywhere; }
     .quiet { color: var(--vscode-descriptionForeground); }
     .bad { color: var(--vscode-errorForeground); }
     .count { font-weight: 400; font-size: .9em; color: var(--vscode-descriptionForeground); padding-left: .5em; }
@@ -287,19 +287,21 @@ function shell(body: string): string {
     .meta { margin: 0 0 .3em; color: var(--vscode-descriptionForeground); }
     .meta .dot { padding: 0 .45em; opacity: .6; }
     .lede { margin: 0; color: var(--vscode-descriptionForeground); }
-    .how { display: grid; grid-template-columns: repeat(auto-fit, minmax(14em, 1fr)); gap: 1em 1.6em;
+    .how { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(14em, 100%), 1fr)); gap: 1em 1.6em;
            margin: 1em 0 0; padding-top: .8em; border-top: 1px solid var(--vscode-panel-border);
            width: 100%; }
     .how h4 i { font-style: normal; color: var(--vscode-descriptionForeground); padding-left: .45em; }
     .how span { display: block; margin-top: .15em; line-height: 1.5;
                 color: var(--vscode-descriptionForeground); }
 
-    .main { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 1.6em 2em 1em; }
+    /* min-width: 0 on the scrolling region, or a long path sets its minimum width and the pane scrolls
+       sideways instead of wrapping. A flex item's default min-width: auto is the whole cause. */
+    .main { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; padding: 1.6em 2em 1em; }
     /* One vertical rhythm for the whole page: every section is separated by the same margin. */
     .main section { margin: 0 0 2.2em; }
     .main section:last-child { margin-bottom: 0; }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(20em, 1fr)); gap: .8em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(20em, 100%), 1fr)); gap: .8em; }
     .card { border: 1px solid var(--vscode-panel-border); border-radius: 4px; padding: .7em .8em; }
     .card p { margin: .3em 0 0; color: var(--vscode-descriptionForeground); font-size: .95em; }
     .card .mark { float: right; font-weight: 400; font-size: .85em;
@@ -307,11 +309,12 @@ function shell(body: string): string {
 
     .facts { border-collapse: collapse; width: 100%; margin: .3em 0 .6em; }
     .facts th, .facts td { text-align: left; padding: .3em 1em .3em 0; font-weight: 400;
-                           border-bottom: 1px solid var(--vscode-panel-border); }
-    .facts th { color: var(--vscode-descriptionForeground); white-space: nowrap; width: 9em; }
+                           border-bottom: 1px solid var(--vscode-panel-border); overflow-wrap: anywhere; }
+    .facts th { color: var(--vscode-descriptionForeground); white-space: nowrap; }
     table.grid2 { border-collapse: collapse; width: 100%; }
     table.grid2 th, table.grid2 td { text-align: left; padding: .3em .8em .3em 0;
-                                     border-bottom: 1px solid var(--vscode-panel-border); }
+                                     border-bottom: 1px solid var(--vscode-panel-border);
+                                     overflow-wrap: anywhere; }
     table.grid2 th { font-weight: 600; color: var(--vscode-descriptionForeground); }
   `;
   return `<!DOCTYPE html>

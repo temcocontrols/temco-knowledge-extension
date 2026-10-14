@@ -219,6 +219,37 @@ repository, no branch and no product name, and it reads whatever the catalog and
 
 ### The window
 
+**As built, 2026-10-14.** The figures below are the design; what exists is these same surfaces with different
+names, and the difference is recorded here rather than left to be discovered:
+
+- The sidebar holds **three** sections in one container, not two: **Workspace** (the page tree, what phase 1
+  built), **Work** (what needs doing — faults per open folder, and changes not yet shown), **Library** (the
+  projects, the sources with their pages beneath them, and the catalog's own state).
+- The unit is called a **project** in everything a person reads. The catalog's table is still `documents`; a
+  project is what that row is, and renaming the table buys nothing but a migration.
+- **Two pages, two jobs.** The **hub** (`src/projectHub.ts`) is what a project *is* — Overview · Pages · Sources
+  · AI · Builds, with Read and Build at the top. The **edit page** (`src/projectPage.ts`) is what it is *made
+  of*. Opening the editor for every look at a project would make reading its pages and editing its fields the
+  same act, so they are separate commands (`openProject` and `editProject`).
+- **Our pages are tabs in one group**, and so are the documentation pages they open — never a split. The rule
+  lives in `src/surface.ts` and is stated there once, together with the two wrong answers that led to it: a page
+  opened `Beside` produced a second column a few hundred pixels wide, and "is the tab in front one of ours?" —
+  tried twice — is not a question a webview tab answers reliably. So the file asks nothing about what is in
+  front; it finds the group that already holds a page of ours and opens there, which makes one group the only
+  outcome. `reveal` with that column also *moves* a page a previous layout left in a second group, so the split
+  heals the next time the page is opened. `ViewColumn` is named in exactly one place in the whole source.
+- **The layout survives a narrow column.** Every grid is `minmax(min(Nem, 100%), 1fr)`, every flex child that
+  holds text is `min-width: 0`, and a table wider than the pane scrolls inside its own box. A bare `minmax(Nem,
+  1fr)` sets a hard floor that pushed the right-hand column out of the pane — the page scrolled sideways
+  instead of reflowing, and it looked like a rendering fault rather than a CSS one.
+- The **AI page** (`src/aiPage.ts`) is the AI as something owned and configured — the four facts a person needs
+  before trusting an answer, what can be downloaded, and which is chosen. It stands beside the AI *panel*: the
+  panel is the conversation, the page is the setup. A project's AI tab carries the same facts plus the
+  suggestions read from that project's pages.
+- **Suggestions need no model.** The ones on the AI tab — an unowned page, a source never read, a chapter past
+  about 25 pages, a repeated title — come from the catalog, so they are identical with the AI off. What a model
+  adds is prose over the same facts, never the facts themselves.
+
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
 │ Temco Knowledge Studio — T3000 Developer Help                                     ⌘  ▢  ✕     │
@@ -395,8 +426,8 @@ real choice rather than a silent preference.
 | Step | What | Done when |
 |---|---|---|
 | **R1** | **The catalog** — the store, its schema, migrations, and the rows above | **done 2026-10-13**: 12 tables, applied idempotently and exercised against a real `node:sqlite` database — inserts, the document↔source join, the unseen-events query. The store lives in `globalStorageUri`, never in a repository |
-| **R2** | **Sources** — add a git source (any host, chosen branch) or a folder; local, materialised and online modes | a source is added, read, and remembered across restarts |
-| **R3** | **Documents** — create one, cite sources, choose a recipe, and build it | a real artifact is produced and recorded (`t3000_dev.chm`, a PDF, the site) |
+| **R2** | **Sources** — add a git source (any host, chosen branch) or a folder; local, materialised and online modes | **partly built 2026-10-14**: a source is added, read in `local` and `api` mode, and remembered across restarts. Not built: the materialised (`fetch`) mode, and the branch mismatch is reported by the Content view rather than by a read |
+| **R3** | **Documents** — create one, cite sources, choose a recipe, and build it | **partly built 2026-10-14**: a project is created, cites sources, chooses a recipe, and its build runs the repository's own script as a task and records the files by path. Not verified: a real artifact (`t3000_dev.chm`) has not been produced through this path yet |
 | **R4** | **AI over history** — commit summaries, affected pages, drafts, the owed list, as a resumable job | a real commit has a summary and a draft, and a human still approves |
 | **R5** | **The views** — Documents and Sources: health, fidelity, latest push, *Since you last looked* | the platform answers "what do I have, and what changed?" in one screen |
 | **R6** | **Editing and publishing** — draft branches locally, the design package's hosted editor, PR flow | a page is corrected and published end to end, by a person |

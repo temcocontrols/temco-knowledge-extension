@@ -150,14 +150,47 @@
         "icon": "$(database)"
       },
       {
-        "command": "temcoKnowledge.newDocument",
-        "title": "Create a Document",
+        "command": "temcoKnowledge.newProject",
+        "title": "Create a Project",
         "icon": "$(new-folder)"
       },
       {
         "command": "temcoKnowledge.addSource",
         "title": "Add a Source",
         "icon": "$(add)"
+      },
+      {
+        "command": "temcoKnowledge.openProject",
+        "title": "Open a Project",
+        "icon": "$(book)"
+      },
+      {
+        "command": "temcoKnowledge.editProject",
+        "title": "Edit a Project"
+      },
+      {
+        "command": "temcoKnowledge.buildProject",
+        "title": "Build the Project",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "temcoKnowledge.aiPage",
+        "title": "The AI",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "temcoKnowledge.readSource",
+        "title": "Read a Source",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "temcoKnowledge.openFile",
+        "title": "Open a Page File"
+      },
+      {
+        "command": "temcoKnowledge.setToken",
+        "title": "Set a GitHub Token",
+        "icon": "$(key)"
       }
     ],
     "menus": {
@@ -188,7 +221,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "temcoKnowledge.newDocument",
+          "command": "temcoKnowledge.newProject",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@0"
         },
@@ -196,6 +229,26 @@
           "command": "temcoKnowledge.addSource",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@2"
+        },
+        {
+          "command": "temcoKnowledge.readSource",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@3"
+        },
+        {
+          "command": "temcoKnowledge.setToken",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@4"
+        },
+        {
+          "command": "temcoKnowledge.buildProject",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@5"
+        },
+        {
+          "command": "temcoKnowledge.aiPage",
+          "when": "view == temcoKnowledge.ai",
+          "group": "navigation@0"
         }
       ],
       "view/item/context": [

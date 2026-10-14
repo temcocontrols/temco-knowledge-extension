@@ -4,6 +4,7 @@
 // choosing a model and moving it off the disk is the part that has to be trustworthy first.
 
 import * as vscode from 'vscode';
+import { AiPage } from '../aiPage';
 import { CatalogEntry, MODELS, entryById, formatBytes, runtimeFor } from './catalog';
 import { InstalledArtifact, install, installedArtifacts, modelRoot, uninstall } from './install';
 import { aiStatus, showAiLog, stopAiServer } from './runtime';
@@ -19,7 +20,9 @@ interface Removal extends vscode.QuickPickItem {
 }
 
 export function registerAiCommands(context: vscode.ExtensionContext): void {
+  const page = new AiPage(context);
   context.subscriptions.push(
+    vscode.commands.registerCommand('temcoKnowledge.aiPage', () => page.open()),
     vscode.commands.registerCommand('temcoKnowledge.models', () => chooseModel(context)),
     vscode.commands.registerCommand('temcoKnowledge.removeModel', () => removeModel(context)),
     vscode.commands.registerCommand('temcoKnowledge.openModelFolder', async () => {
@@ -38,8 +41,8 @@ async function showAiStatus(context: vscode.ExtensionContext): Promise<void> {
     : 'nothing installed yet — no model, so no server';
 
   const items = status.running
-    ? ['Open the panel', 'Stop the server', 'Show the log', 'Models and Runtime']
-    : ['Open the panel', 'Models and Runtime', 'Show the log'];
+    ? ['Open the panel', 'Stop the server', 'Show the log', 'The AI page']
+    : ['Open the panel', 'The AI page', 'Show the log'];
   const answer = await vscode.window.showInformationMessage(
     `Temco Knowledge: local AI — ${summary}`,
     ...items
@@ -51,8 +54,8 @@ async function showAiStatus(context: vscode.ExtensionContext): Promise<void> {
     stopAiServer();
   } else if (answer === 'Show the log') {
     showAiLog();
-  } else if (answer === 'Models and Runtime') {
-    await vscode.commands.executeCommand('temcoKnowledge.models');
+  } else if (answer === 'The AI page') {
+    await vscode.commands.executeCommand('temcoKnowledge.aiPage');
   }
 }
 
