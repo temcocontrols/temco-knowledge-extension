@@ -21,7 +21,9 @@ folder, an archive), the **documents** a person creates and versions (`t3000_dev
 **builds and artifacts** that come out, the AI that reads the history, and the **SQLite catalog** that remembers
 all of it. Its build order is **R1–R6** there, and that is where the next work is planned. This file still holds
 the per-feature steps, and the design package still wins wherever content, registry or publishing rules are
-concerned.
+concerned. **R6** — the editor, creating a page, images, drafts — has its own design in
+[`editor-design.md`](editor-design.md), written because its first three steps change what this extension is
+allowed to write into a product repository.
 
 Two consequences worth stating, because they were wrong before: a **repository is not the unit of work** — a
 document is, and a repository is only one kind of source — and a project is **not** defined by already carrying a

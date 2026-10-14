@@ -13,6 +13,7 @@ import { Catalog } from './catalog/store';
 import { registerCatalogCommands } from './catalog/commands';
 import { publishDiagnostics } from './diagnostics';
 import { registerFeedbackCommands } from './feedback';
+import { registerFormatCommands } from './format';
 import { HomePanel } from './home';
 import { NeedsPage } from './needsPage';
 import { registerProjectCommands } from './project';
@@ -268,6 +269,9 @@ export function activate(context: vscode.ExtensionContext): void {
   registerProjectCommands(context, selection, () => void refresh());
   registerProjectBuildCommands(context, output);
   registerReadCommands(context, selection, output, () => void refresh());
+  // The Markdown toolbar: it edits the page in front, and reads the registry only to offer a link to a real
+  // page — the one write-side surface in this extension that writes nothing.
+  registerFormatCommands(context, () => roots);
 
   context.subscriptions.push(
     vscode.commands.registerCommand('temcoKnowledge.openNeeds', () => needs.open()),

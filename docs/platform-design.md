@@ -356,6 +356,49 @@ right side bar* (`temcoKnowledge.aiDockRight`) focuses the view and invokes the 
 That is also why the extension never asks *where* a view currently is: the view-location API is not exposed to
 extensions, and the reset command makes the question unnecessary.
 
+### The toolbar, as built 2026-10-14
+
+The design package puts the editor on the **website** — `15-online-editor.md` §1 picks Monaco, §2 gives the toolbar
+it needs, and §3 the API behind it. Two of those three are already true on the desktop without a line of ours, and
+saying which is which is what keeps this small:
+
+```
+  what 15-online-editor.md asks for            the website has to      this application already has
+  ──────────────────────────────────────────── ─────────────────────── ──────────────────────────────────
+  Monaco, the editing core                      bundle it, ~2 MB        VS Code *is* Monaco plus a shell
+  find, folding, breadcrumb outline, minimap    free once bundled       the same, from the editor
+  gate findings as squiggles on the line        /api/docs/validate      src/diagnostics.ts, already written
+  a toolbar of formatting buttons               build it in main.js     src/format.ts — this step
+  link completion from index.json               a completion provider   Link to a page, a command
+  a WYSIWYG mode                                refused on principle    refused for the same reason
+  preview identical to the site                 docfx serve in an iframe the repository's own build
+  publish, and the PR it opens                  POST /api/docs/publish  never: we build, we do not publish
+```
+
+The one row that *is* work is the toolbar, and it lands in the editorial surfaces a person already uses rather
+than in a page of ours: four buttons in the editor's title bar for a Markdown file, the same sixteen actions in
+the submenu on the editor's context menu and on the tab's, and one **Format** entry that lists them all, so the
+palette is the keyboard path. `15-online-editor.md` §2 asks for the same list, and the set matches it: emphasis,
+headings, the lists, the quote, the code block, the table, the rule, an image, a link to a page, an outline.
+
+Three decisions inside it are worth recording, because each one had two answers:
+
+| Decision | Taken | Why |
+|---|---|---|
+| The editor is VS Code's, with our toolbar on it | **not an embedded editor page** | the design package's own §9 refuses an embedded VS Code for the website; here it would be embedding the editor inside the editor, and re-building the preview, the markers and the file handling that already exist |
+| No Markdown formatting commands ship in VS Code | **so these are ours** | checked, not assumed: no `toggleBold` exists in any built-in extension, so `**…**` had no button before this |
+| No keybindings are contributed | **deliberate** | `Ctrl+B` hides the side bar everywhere else, and this extension must keep working in an ordinary VS Code. Every action is a command named `temcoKnowledge.format.*`, so a chord is one binding away for whoever wants it |
+
+The button that needed a rule rather than an implementation is **Link to a page**. `05-content-and-registry.md`
+fixes the form — a *relative* `.md` link, resolved and warned on by the build, with `~/` for root-relative — so the
+picker offers the pages the registry declares and inserts a path the gate can resolve. A page in another source is
+refused in words, because no relative path reaches it. **Callout** takes its five kinds from DocFX's own alerts
+(`> [!NOTE]`, `TIP`, `IMPORTANT`, `CAUTION`, `WARNING`), which is the syntax the renderer actually implements.
+
+**An image is the one button that is not here**, and the reason is the write rule rather than the code: the file
+has to be written into the page's own `media/` before the reference to it points at anything. That amendment, the
+kinds of new document, and what each costs are the subject of `docs/editor-design.md`.
+
 ### Documents — the home page
 
 ```
@@ -496,7 +539,9 @@ extensions, and the reset command makes the question unnecessary.
 | **R3** | **Documents** — create one, cite sources, choose a recipe, and build it | **partly built 2026-10-14**: a project is created, cites sources, chooses a recipe, and its build runs the repository's own script as a task and records the files by path. Not verified: a real artifact (`t3000_dev.chm`) has not been produced through this path yet |
 | **R4** | **AI over history** — commit summaries, affected pages, drafts, the owed list, as a resumable job | a real commit has a summary and a draft, and a human still approves |
 | **R5** | **The views** — Documents and Sources: health, fidelity, latest push, *Since you last looked* | **partly built 2026-10-14**: the sidebar holds Workspace (the pages of the project being worked on) and Library (projects · what needs attention · sources · catalog), and *What needs doing* answers "what do I have, and what changed?" on a page. Not built: the *Since you last looked* digest, and fidelity per source beyond the read mode |
-| **R6** | **Editing and publishing** — draft branches locally, the design package's hosted editor, PR flow | a page is corrected and published end to end, by a person |
+| **R6** | **Editing and publishing** — the editor with its toolbar, creating a document, images, draft branches, the design package's hosted editor, PR flow | **started 2026-10-14**: the **toolbar** is built on VS Code's own editor — emphasis, blocks, a link to a real page, the outline — as the sixteen `temcoKnowledge.format.*` commands in `src/format.ts`, in the editor's title bar, its two context menus and the palette. Not built: creating a document, inserting an image, drafts and the PR flow — the first two are waiting on the write rule below |
+
+**The R6 step that is left is mostly a rule change, not a feature.** The toolbar edits the buffer a person is already typing in, so it adds no writer at all. The next two do: an image has to land in the page's own `media/` before a reference to it means anything, and a new page is a **pair** — the file *and* its `registry.json` entry, because the registry is the structure and an unregistered `.md` is an error the generator reports. So the amendment is the decision, and `docs/editor-design.md` lays it out with the evidence; the two writes we have today stay exactly as they are until it is made.
 
 **R1–R3 make it a documentation platform**: sources in, documents and artifacts out. R4 makes it intelligent.
 R5 makes it a management system. R6 closes the loop.

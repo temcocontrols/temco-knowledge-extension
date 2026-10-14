@@ -61,13 +61,20 @@ belong to the **product** repository, which keeps the content and the publishing
 
 ```
 src/registry.ts      reads docs/help/registry.json + the generated index.json/page-meta.json, runs the checks
-src/tree.ts          the Content view (areas, chapters, pages, Gaps, issue children, provenance in tooltips)
+src/tree.ts          the Workspace view (areas, chapters, pages, Gaps, issue children, provenance in tooltips)
+src/views.ts         the Library view: projects · what needs attention · sources · the catalog · the AI
 src/diagnostics.ts   turns issues into Problems, in the file that has to be fixed
-src/extension.ts     activation: view, status bar, commands, file watcher
+src/extension.ts     activation: the views, the status bar, the commands, the refresh, the file watcher
 src/builds.ts        invokes the product repo's own build scripts (never the deploying one)
 src/report.ts        the staleness report, grouped by owner (Markdown, untitled, no writes)
 src/scaffold.ts      starts a registry in an open folder that has none (smallest valid file, confirmed)
 src/feedback.ts      feedback rows routed to their owner, against a proposed file shape
+src/format.ts        the Markdown toolbar: formatting, blocks, a link to a real page, the outline
+src/selected.ts      which project is being worked on, and which page of it (workspaceState)
+src/surface.ts       the one-tab-group rule — ViewColumn is named only here
+src/home.ts          the dashboard · src/projectsPage.ts the list · src/projectHub.ts one project
+src/projectPage.ts   create or edit a project · src/needsPage.ts what needs doing · src/aiPage.ts the AI
+src/read.ts          reading a source (local · api) and recording what it found
 src/catalog/         schema.ts (the tables) · store.ts (node:sqlite, in the extension's own storage,
                      never in a repository) · commands.ts (the catalog status)
 src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack),
@@ -75,14 +82,16 @@ src/ai/              catalog.ts (what can be downloaded), install.ts (download/v
                      history.ts (the commit range), citations.ts (what an answer pointed at),
                      panel.ts (the AI panel), commands.ts (the model list + AI status)
 media/               knowledge.svg (the activity-bar icon); ai-panel.js/.css (the AI panel)
-media/knowledge.svg  the activity-bar icon
 prompts/             the instruction text the AI receives (system.md, ask.md, draft.md, area.md)
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
 
 Contributed surface lives in `package.json`: two view containers — `temcoKnowledge` in the activity bar, holding
-the Content view, and `temcoKnowledgePanel` in the panel (docked on the right by the workbench), holding the AI webview view
-(`temcoKnowledge.ai`) — and the commands, all named `temcoKnowledge.*`.
+the **Workspace** and **Library** views, and `temcoKnowledgePanel` declared under
+`contributes.viewsContainers.secondarySidebar` (the right side bar, where it belongs by default), holding the AI
+webview view (`temcoKnowledge.ai`) — and the commands, all named `temcoKnowledge.*`. The Markdown toolbar lives
+in the editor's own menus (`editor/title`, `editor/context`) rather than in a page of its own:
+`docs/editor-design.md` says why.
 
 ## Conventions
 

@@ -251,9 +251,181 @@
         "command": "temcoKnowledge.setToken",
         "title": "Set a GitHub Token",
         "icon": "$(key)"
+      },
+      {
+        "command": "temcoKnowledge.format.pick",
+        "title": "Format"
+      },
+      {
+        "command": "temcoKnowledge.format.bold",
+        "title": "Bold"
+      },
+      {
+        "command": "temcoKnowledge.format.italic",
+        "title": "Italic"
+      },
+      {
+        "command": "temcoKnowledge.format.code",
+        "title": "Inline Code"
+      },
+      {
+        "command": "temcoKnowledge.format.heading",
+        "title": "Heading Level"
+      },
+      {
+        "command": "temcoKnowledge.format.bullet",
+        "title": "Bullet List"
+      },
+      {
+        "command": "temcoKnowledge.format.numbered",
+        "title": "Numbered List"
+      },
+      {
+        "command": "temcoKnowledge.format.task",
+        "title": "Task List"
+      },
+      {
+        "command": "temcoKnowledge.format.quote",
+        "title": "Block Quote"
+      },
+      {
+        "command": "temcoKnowledge.format.codeBlock",
+        "title": "Code Block"
+      },
+      {
+        "command": "temcoKnowledge.format.table",
+        "title": "Table"
+      },
+      {
+        "command": "temcoKnowledge.format.rule",
+        "title": "Horizontal Rule"
+      },
+      {
+        "command": "temcoKnowledge.format.callout",
+        "title": "Callout"
+      },
+      {
+        "command": "temcoKnowledge.format.link",
+        "title": "Link"
+      },
+      {
+        "command": "temcoKnowledge.format.linkPage",
+        "title": "Link to a Page"
+      },
+      {
+        "command": "temcoKnowledge.format.outline",
+        "title": "Go to a Heading"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "temcoKnowledge.markdown",
+        "label": "Temco Knowledge"
       }
     ],
     "menus": {
+      "editor/title": [
+        {
+          "command": "temcoKnowledge.format.bold",
+          "when": "editorLangId == markdown && resourceScheme == file",
+          "group": "temcoKnowledge@1"
+        },
+        {
+          "command": "temcoKnowledge.format.italic",
+          "when": "editorLangId == markdown && resourceScheme == file",
+          "group": "temcoKnowledge@2"
+        },
+        {
+          "command": "temcoKnowledge.format.linkPage",
+          "when": "editorLangId == markdown && resourceScheme == file",
+          "group": "temcoKnowledge@3"
+        },
+        {
+          "command": "temcoKnowledge.format.pick",
+          "when": "editorLangId == markdown && resourceScheme == file",
+          "group": "temcoKnowledge@4"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "submenu": "temcoKnowledge.markdown",
+          "when": "editorLangId == markdown && resourceScheme == file",
+          "group": "temcoKnowledge@1"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "temcoKnowledge.markdown",
+          "when": "editorLangId == markdown && resourceScheme == file",
+          "group": "temcoKnowledge@1"
+        }
+      ],
+      "temcoKnowledge.markdown": [
+        {
+          "command": "temcoKnowledge.format.pick",
+          "group": "0_top@1"
+        },
+        {
+          "command": "temcoKnowledge.format.bold",
+          "group": "1_inline@1"
+        },
+        {
+          "command": "temcoKnowledge.format.italic",
+          "group": "1_inline@2"
+        },
+        {
+          "command": "temcoKnowledge.format.code",
+          "group": "1_inline@3"
+        },
+        {
+          "command": "temcoKnowledge.format.heading",
+          "group": "2_blocks@1"
+        },
+        {
+          "command": "temcoKnowledge.format.bullet",
+          "group": "2_blocks@2"
+        },
+        {
+          "command": "temcoKnowledge.format.numbered",
+          "group": "2_blocks@3"
+        },
+        {
+          "command": "temcoKnowledge.format.task",
+          "group": "2_blocks@4"
+        },
+        {
+          "command": "temcoKnowledge.format.quote",
+          "group": "2_blocks@5"
+        },
+        {
+          "command": "temcoKnowledge.format.codeBlock",
+          "group": "2_blocks@6"
+        },
+        {
+          "command": "temcoKnowledge.format.table",
+          "group": "2_blocks@7"
+        },
+        {
+          "command": "temcoKnowledge.format.rule",
+          "group": "2_blocks@8"
+        },
+        {
+          "command": "temcoKnowledge.format.callout",
+          "group": "2_blocks@9"
+        },
+        {
+          "command": "temcoKnowledge.format.link",
+          "group": "3_insert@1"
+        },
+        {
+          "command": "temcoKnowledge.format.linkPage",
+          "group": "3_insert@2"
+        },
+        {
+          "command": "temcoKnowledge.format.outline",
+          "group": "4_navigate@1"
+        }
+      ],
       "view/title": [
         {
           "command": "temcoKnowledge.home",
