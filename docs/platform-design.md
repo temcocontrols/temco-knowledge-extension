@@ -255,6 +255,24 @@ no longer exists is worse than no tab: the removal says so in one message, close
 of what is left. Removal from any surface does this, and a page opened for a project that is not there does the
 same thing rather than rendering.
 
+**There is no *Work* view.** It was a second copy of the tree's *Gaps* list plus a counter, in a third place,
+behind one icon that meant five things at once — decided with the user on 2026-10-14. What replaced it:
+
+- the sidebar's **Library** holds one expandable **Needs attention** row: a count line, the missing-file row, a
+  stale row, an unowned row, then the faulty pages, then **More…**
+- **More…** (or the row's title, or the row's title-bar button) opens **What needs doing** — a page with the room
+  to say *why* each thing is listed and *where* the fix is: sources · faults · declared-but-missing · stale ·
+  no owner · owed. A missing file is created from there with one click, which is the one write we are allowed
+- each mark means **one** thing: `⊗` a structural fault, `!` a declared page whose file is absent, `↺` the
+  generator's stale verdict, `▲` an unowned page, `⇄` owed
+- the **staleness report** moved to the Library's title bar, where the view it belonged to used to be
+
+**Owed is never computed here.** *Documentation owed* is the product repository's own gate —
+`scripts/docs-owed.mjs`, `npm run docs:owed`, waivers that expire (`11-review-and-cicd.md`) — so the page runs
+that script as a task and reports what a run is: where, when, the exit code. Its output, in the terminal, is the
+verdict, and the page says so. A second opinion about what is owed is the one thing a documentation platform
+must not invent.
+
 The selection is state, in one place (`src/selected.ts`, in `workspaceState`): which project, and which page
 of it you were last on. A project belongs to the window, not the machine — two windows on two products must not
 answer about each other's pages. Opening a project makes it the one being worked on, and the library row, the
@@ -476,7 +494,7 @@ real choice rather than a silent preference.
 | **R2** | **Sources** — add a git source (any host, chosen branch) or a folder; local, materialised and online modes | **partly built 2026-10-14**: a source is added, read in `local` and `api` mode, and remembered across restarts. Not built: the materialised (`fetch`) mode, and the branch mismatch is reported by the Content view rather than by a read |
 | **R3** | **Documents** — create one, cite sources, choose a recipe, and build it | **partly built 2026-10-14**: a project is created, cites sources, chooses a recipe, and its build runs the repository's own script as a task and records the files by path. Not verified: a real artifact (`t3000_dev.chm`) has not been produced through this path yet |
 | **R4** | **AI over history** — commit summaries, affected pages, drafts, the owed list, as a resumable job | a real commit has a summary and a draft, and a human still approves |
-| **R5** | **The views** — Documents and Sources: health, fidelity, latest push, *Since you last looked* | the platform answers "what do I have, and what changed?" in one screen |
+| **R5** | **The views** — Documents and Sources: health, fidelity, latest push, *Since you last looked* | **partly built 2026-10-14**: the sidebar holds Workspace (the pages of the project being worked on) and Library (projects · what needs attention · sources · catalog), and *What needs doing* answers "what do I have, and what changed?" on a page. Not built: the *Since you last looked* digest, and fidelity per source beyond the read mode |
 | **R6** | **Editing and publishing** — draft branches locally, the design package's hosted editor, PR flow | a page is corrected and published end to end, by a person |
 
 **R1–R3 make it a documentation platform**: sources in, documents and artifacts out. R4 makes it intelligent.

@@ -48,10 +48,6 @@
           "name": "Workspace"
         },
         {
-          "id": "temcoKnowledge.work",
-          "name": "Work"
-        },
-        {
           "id": "temcoKnowledge.library",
           "name": "Library"
         }
@@ -174,6 +170,20 @@
         "icon": "$(tools)"
       },
       {
+        "command": "temcoKnowledge.openNeeds",
+        "title": "What Needs Doing",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "temcoKnowledge.runOwed",
+        "title": "Run the Repository's Docs-Owed Check",
+        "icon": "$(law)"
+      },
+      {
+        "command": "temcoKnowledge.createPage",
+        "title": "Create the Missing Page File"
+      },
+      {
         "command": "temcoKnowledge.openProjects",
         "title": "Projects",
         "icon": "$(list-flat)"
@@ -251,32 +261,27 @@
           "group": "navigation@2"
         },
         {
-          "command": "temcoKnowledge.stalenessReport",
-          "when": "view == temcoKnowledge.work",
-          "group": "navigation@0"
-        },
-        {
-          "command": "temcoKnowledge.catalog",
-          "when": "view == temcoKnowledge.library",
-          "group": "navigation@1"
-        },
-        {
           "command": "temcoKnowledge.newProject",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@0"
         },
         {
-          "command": "temcoKnowledge.addSource",
+          "command": "temcoKnowledge.openProjects",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@1"
+        },
+        {
+          "command": "temcoKnowledge.openNeeds",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@2"
         },
         {
-          "command": "temcoKnowledge.readSource",
+          "command": "temcoKnowledge.catalog",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@3"
         },
         {
-          "command": "temcoKnowledge.setToken",
+          "command": "temcoKnowledge.addSource",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@4"
         },
@@ -286,19 +291,29 @@
           "group": "navigation@5"
         },
         {
-          "command": "temcoKnowledge.selectProject",
+          "command": "temcoKnowledge.readSource",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@6"
         },
         {
-          "command": "temcoKnowledge.buildProject",
+          "command": "temcoKnowledge.selectProject",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@7"
         },
         {
-          "command": "temcoKnowledge.openProjects",
+          "command": "temcoKnowledge.buildProject",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@8"
+        },
+        {
+          "command": "temcoKnowledge.stalenessReport",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@9"
+        },
+        {
+          "command": "temcoKnowledge.setToken",
+          "when": "view == temcoKnowledge.library",
+          "group": "navigation@10"
         },
         {
           "command": "temcoKnowledge.aiPage",
@@ -383,12 +398,8 @@
         "contents": "No documentation is being read yet.\n\nWork on a project — or open a folder that holds one — and its pages, its faults and its totals appear here beside the code they document."
       },
       {
-        "view": "temcoKnowledge.work",
-        "contents": "Nothing needs attention.\n\nThis fills in as projects are opened and changed: pages whose file is missing, pages with no owner, pages never reviewed, and changes the application has not shown you yet."
-      },
-      {
         "view": "temcoKnowledge.library",
-        "contents": "Nothing recorded yet.\n\nA source is read where it already lives: a project at a branch you choose, a folder on this machine, or an archive. A document is what you create and version — one help set, built into a CHM, a PDF or a site."
+        "contents": "Nothing recorded yet.\n\nA project is what you manage: name it, then give it the sources it is built from — a repository at a branch you choose, a folder on this machine, or an archive. Read a source and its pages appear in the Workspace above, beside the code they document.\n\n[Create a project](command:temcoKnowledge.newProject) · [Add a source](command:temcoKnowledge.addSource)"
       }
     ],
     "configuration": {

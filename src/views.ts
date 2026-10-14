@@ -10,7 +10,6 @@ import { slugOf } from './projectPage';
 import { DocsRoot, collectPages, countStale } from './registry';
 import { Selection } from './selected';
 
-export const WORK_VIEW_ID = 'temcoKnowledge.work';
 export const LIBRARY_VIEW_ID = 'temcoKnowledge.library';
 
 export class Row {
@@ -61,8 +60,7 @@ class SectionView implements vscode.TreeDataProvider<Row> {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly selection: Selection,
-    private readonly roots: () => readonly DocsRoot[],
-    private readonly kind: 'work' | 'library'
+    private readonly roots: () => readonly DocsRoot[]
   ) {}
 
   refresh(): void {
@@ -92,69 +90,106 @@ class SectionView implements vscode.TreeDataProvider<Row> {
     if (row) {
       return row.children;
     }
-    if (this.kind === 'work') {
-      return await this.work();
-    }
     return await this.library();
   }
 
-  /** The rows a maintainer acts on, gathered across everything open. */
-  private async work(): Promise<Row[]> {
-    const rows: Row[] = [];
+  /**
+   * What wants a person, as one row.
+   *
+   * This is what the old **Work** view is now: it was a second copy of the tree's *Gaps* list plus a counter, in
+   * a third place, behind one icon that meant five things. So the sidebar holds a count, the first few items,
+   * and a way to the page that has room for the rest — and each item carries a mark that means only one thing.
+   */
+  private async attention(): Promise<Row> {
+    const roots = this.roots();
+    const faulty: Row[] = [];
+    let errors = 0;
+    let warnings = 0;
+    let stale = 0;
+    let unowned = 0;
+    let missing = 0;
 
-    for (const root of this.roots()) {
+    for (const root of roots) {
       const pages = collectPages(root);
-      const missing = pages.filter((page) => !page.exists);
-      const stale = countStale(pages);
-      const faulty = pages.filter((page) => page.issues.length > 0);
+      errors += root.errors;
+      warnings += root.warnings;
+      stale += countStale(pages);
+      unowned += pages.filter((page) => page.owner.length === 0).length;
+      missing += pages.filter((page) => !page.exists).length;
 
-      const children: Row[] = faulty.map(
-        (entry) =>
+      for (const page of pages.filter((entry) => entry.issues.length > 0)) {
+        const worst = page.issues.some((issue) => issue.severity === 'error');
+        faulty.push(
           new Row(
-            entry.title || entry.id,
-            entry.issues.map((issue) => issue.message).join(' · '),
-            entry.issues.some((issue) => issue.severity === 'error') ? 'error' : 'warning'
-          )
-      );
-      if (missing.length > 0) {
-        children.unshift(
-          new Row(
-            `${missing.length} page${missing.length === 1 ? '' : 's'} declared but no file`,
-            'its registry.json entry names a page that is not there',
-            'error'
+            page.title || page.id,
+            page.issues.map((issue) => issue.message).join(' · '),
+            worst ? 'error' : 'warning'
           )
         );
       }
+    }
 
-      rows.push(
+    const children: Row[] = [];
+    if (missing > 0) {
+      children.push(
         new Row(
-          root.folder.name,
-          [
-            `${root.errors} error${root.errors === 1 ? '' : 's'}`,
-            `${root.warnings} warning${root.warnings === 1 ? '' : 's'}`,
-            `${root.neverReviewed} never reviewed`,
-            stale > 0 ? `${stale} stale` : undefined,
-          ]
-            .filter((part): part is string => part !== undefined)
-            .join(' · '),
-          children.length > 0 ? 'warning' : 'pass',
-          children
+          `${missing} page${missing === 1 ? '' : 's'} declared but no file`,
+          'the registry names a page that is not there',
+          'error',
+          [],
+          { command: 'temcoKnowledge.openRegistry', args: [] },
+          'missing'
         )
       );
     }
+    if (stale > 0) {
+      children.push(
+        new Row(`${stale} stale`, 'the generator said so — read from index.json, never recomputed', 'history', [], undefined, 'stale')
+      );
+    }
+    if (unowned > 0) {
+      children.push(
+        new Row(`${unowned} without an owner`, 'an owner is where a defect goes', 'person', [], undefined, 'unowned')
+      );
+    }
+    children.push(...faulty.slice(0, 20));
 
     const unseen = await this.unseen();
     if (unseen > 0) {
-      rows.unshift(
-        new Row(
-          `${unseen} change${unseen === 1 ? '' : 's'} not shown yet`,
-          'the application noticed these and has not told you',
-          'bell'
-        )
+      children.push(
+        new Row(`${unseen} change${unseen === 1 ? '' : 's'} not shown yet`, 'noticed, and not yet told', 'bell')
       );
     }
+    children.push(
+      new Row(
+        'More…',
+        'everything that wants a person, with the reason and where the fix is',
+        'ellipsis',
+        [],
+        { command: 'temcoKnowledge.openNeeds', args: [] },
+        'needs'
+      )
+    );
 
-    return rows;
+    const nothing = errors + warnings + stale + missing === 0;
+    return new Row(
+      'Needs attention',
+      nothing
+        ? 'nothing — no fault, nothing stale, every page has a file'
+        : [
+            errors > 0 ? `${errors} error${errors === 1 ? '' : 's'}` : undefined,
+            warnings > 0 ? `${warnings} warning${warnings === 1 ? '' : 's'}` : undefined,
+            stale > 0 ? `${stale} stale` : undefined,
+            unowned > 0 ? `${unowned} unowned` : undefined,
+            missing > 0 ? `${missing} missing file${missing === 1 ? '' : 's'}` : undefined,
+          ]
+            .filter((part): part is string => part !== undefined)
+            .join(' · '),
+      nothing ? 'pass' : 'warning',
+      children,
+      { command: 'temcoKnowledge.openNeeds', args: [] },
+      'needs'
+    );
   }
 
   /**
@@ -276,6 +311,8 @@ class SectionView implements vscode.TreeDataProvider<Row> {
           `${catalog.counts().length} tables · schema ${catalog.schemaVersion()} · on this machine`,
           'database'
         ),
+        // Last, not first: what wants a person is the loudest row, and the things you *have* come first.
+        await this.attention(),
       ];
     } catch {
       rows = [new Row('Catalog', 'not opened yet', 'database')];
@@ -304,15 +341,10 @@ export function registerSectionViews(
   selection: Selection,
   roots: () => readonly DocsRoot[]
 ): { refresh(): void } {
-  const work = new SectionView(context, selection, roots, 'work');
-  const library = new SectionView(context, selection, roots, 'library');
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider(WORK_VIEW_ID, work),
-    vscode.window.registerTreeDataProvider(LIBRARY_VIEW_ID, library)
-  );
+  const library = new SectionView(context, selection, roots);
+  context.subscriptions.push(vscode.window.registerTreeDataProvider(LIBRARY_VIEW_ID, library));
   return {
     refresh(): void {
-      work.refresh();
       library.refresh();
     },
   };

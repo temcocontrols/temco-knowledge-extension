@@ -138,6 +138,48 @@ async function build(root: DocsRoot, output: vscode.OutputChannel, recipe: Recip
   }
 }
 
+/**
+ * Runs the repository's own `docs:owed` check.
+ *
+ * Invoked, never reimplemented — and never interpreted. What is owed is a *documentation gate* the product
+ * repository owns, with its own waivers and its own expiry dates (`11-review-and-cicd.md`), so this runs the
+ * script as a task (visible, cancellable, in the terminal) and reports only what a run is: where, when, and the
+ * exit code. Reading its output to decide anything here would be the second opinion the design forbids.
+ */
+export async function runOwed(
+  roots: readonly DocsRoot[],
+  output: vscode.OutputChannel
+): Promise<{ folder: string; exit: number | undefined; at: string } | undefined> {
+  const candidates = roots.filter((root) => root.origin !== 'catalog');
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  output.appendLine('');
+  for (const root of candidates) {
+    const scripts = scriptsOf(root);
+    if (typeof scripts?.['docs:owed'] !== 'string') {
+      output.appendLine(`  ${root.folder.name}: no \`docs:owed\` script — nothing was run there.`);
+      continue;
+    }
+
+    output.appendLine(`Checking what documentation is owed in ${root.folder.name}: npm run docs:owed`);
+    const exit = await runTask(root, 'docs:owed');
+    output.appendLine(
+      `npm run docs:owed exited with ${exit === undefined ? 'no code' : exit} — its output above is the verdict.`
+    );
+    output.show(true);
+    return { folder: root.folder.name, exit, at: new Date().toISOString().slice(0, 16).replace('T', ' ') };
+  }
+
+  output.appendLine('  No repository being read has a `docs:owed` script.');
+  output.show(true);
+  void vscode.window.showInformationMessage(
+    'Temco Knowledge: no repository being read has a docs:owed check, so there is nothing to run.'
+  );
+  return undefined;
+}
+
 /** Every file the run produced: newer than it started, and matching the recipe. */
 function findArtifacts(recipe: Recipe, since: number): string[] {
   const found: string[] = [];
@@ -203,9 +245,14 @@ function siblingHelpDocs(folder: string): string[] {
 }
 
 function runTask(root: DocsRoot, script: string): Promise<number | undefined> {
+  // The scope is the workspace folder when it is one: a source of a project can be a path this window has
+  // closed, and a task must still be runnable there, so anything else runs unscoped rather than being refused.
+  const folder = (vscode.workspace.workspaceFolders ?? []).find(
+    (one) => one.uri.toString() === root.rootUri.toString()
+  );
   const task = new vscode.Task(
     { type: 'temcoKnowledge', script },
-    root.folder,
+    folder ?? vscode.TaskScope.Global,
     `${root.folder.name}: ${script}`,
     'temcoKnowledge',
     new vscode.ShellExecution('npm', ['run', script], { cwd: root.folder.uri.fsPath })

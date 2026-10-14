@@ -8,12 +8,13 @@ import * as vscode from 'vscode';
 import { registerAiCommands } from './ai/commands';
 import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
-import { registerBuildCommands } from './builds';
+import { registerBuildCommands, runOwed } from './builds';
 import { Catalog } from './catalog/store';
 import { registerCatalogCommands } from './catalog/commands';
 import { publishDiagnostics } from './diagnostics';
 import { registerFeedbackCommands } from './feedback';
 import { HomePanel } from './home';
+import { NeedsPage } from './needsPage';
 import { registerProjectCommands } from './project';
 import { registerProjectBuildCommands } from './projectBuild';
 import { registerReadCommands } from './read';
@@ -62,8 +63,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // The home page: the platform's own entry point, and the one surface that is not about a folder.
   const home = new HomePanel(context, selection, () => roots);
 
-  // The other two sections of the sidebar: what needs doing, and what it reads and produces.
+  // The other section of the sidebar: what it reads and produces. What needs doing sits *in* it, as one row.
   const sections = registerSectionViews(context, selection, () => roots);
+
+  // The page behind that row — the old Work view, with room to say why each thing is listed.
+  const needs = new NeedsPage(context, () => roots);
 
   const refresh = async (): Promise<void> => {
     const broken: BrokenRegistry[] = [];
@@ -131,6 +135,7 @@ export function activate(context: vscode.ExtensionContext): void {
     panel.refresh();
     home.refresh();
     sections.refresh();
+    needs.refresh();
   };
 
   const report = async (): Promise<void> => {
@@ -261,6 +266,22 @@ export function activate(context: vscode.ExtensionContext): void {
   registerProjectCommands(context, selection, () => void refresh());
   registerProjectBuildCommands(context, output);
   registerReadCommands(context, selection, output, () => void refresh());
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('temcoKnowledge.openNeeds', () => needs.open()),
+    vscode.commands.registerCommand('temcoKnowledge.runOwed', () => runOwed(roots, output)),
+    // The one write this extension makes to a page: the empty file for a page the registry already declares.
+    vscode.commands.registerCommand(
+      'temcoKnowledge.createPage',
+      async (target?: { path?: string; title?: string }) => {
+        if (!target?.path) {
+          return;
+        }
+        await createPage(vscode.Uri.file(target.path), target.title ?? 'Page');
+        await refresh();
+      }
+    )
+  );
 
   // The selected project is what everything reads, so a change to it re-reads everything.
   context.subscriptions.push(selection.onDidChange(() => void refresh()));
