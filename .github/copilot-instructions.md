@@ -33,6 +33,11 @@ planned.
 The paths those documents name (`docs/t3000/**`, `docs/help/*.json`, `docs/docfx.json`, `scripts/docs-*.mjs`)
 belong to the **product** repository, which keeps the content and the publishing pipeline.
 
+**This repository has an end.** `docs/temco-platform-handover.md` is its last document: the target architecture of
+`temco-platform` (the fork, renamed — one repository for every Temco module), the migration waves, the ids that
+must not change by accident, and the rules to carry over. Read it before starting anything large here, because
+work that only belongs to the platform is work that should happen there instead.
+
 ## Hard rules
 
 1. **No product content, no secrets.** Never add a product's page, image, registry or any credential to this
@@ -102,6 +107,10 @@ media/               knowledge.svg (the activity-bar icon); ai-panel.js/.css (th
 prompts/             the instruction text the AI receives (system.md, ask.md, draft.md, area.md,
                      newpage.md — the one prompt whose material may be a code file — analyse.md)
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
+docs/temco-platform-handover.md  **the last document written here**: the target architecture of the single
+                 repository the product moves to (the fork, renamed), the migration waves, the ids that must not
+                 change by accident, and the rules to carry over. Read it before starting anything large: work
+                 that belongs to the platform should happen there, not here.
 ```
 
 Contributed surface lives in `package.json`: two view containers — `temcoKnowledge` in the activity bar, holding the

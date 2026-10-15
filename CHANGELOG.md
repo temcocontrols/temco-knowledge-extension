@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **`docs/temco-platform-handover.md` — the last document written here.** The target architecture of the single
+  repository the product moves to (`temco-platform`, the fork renamed): what this repository contributes to it
+  and in which waves, the contracts that must not change by accident (the extension id — and therefore the
+  catalog folder — the settings ids, the command and view ids, the prompt version), the ten rules carried over,
+  the product's own stance on telemetry, updates and the network, the decisions recorded, and what is
+  deliberately not built. It supersedes the sketch kept in Downloads.
 - **the Content view**: the registry reader and the structural checks, areas → chapters → pages with counts
   on the parents, **Gaps**, a page's issues as its children, problems landing in the file that has to be
   fixed, the status bar (`pages · issues · never reviewed`), the output report, and the six `temcoKnowledge.*`
