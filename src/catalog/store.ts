@@ -521,6 +521,16 @@ export class Catalog {
       .run(state.pages ?? null, state.docsRoot ?? null, state.registryPath ?? null, state.state ?? null, slug);
   }
 
+  /**
+   * Where a source's local copy is.
+   *
+   * The working area sets this after a clone, and from then on the source is read from disk: the registry, the
+   * checks, the code files and the history all work on a working tree instead of one API call at a time.
+   */
+  setSourcePath(slug: string, path: string | undefined): void {
+    this.db.prepare('UPDATE sources SET path = ? WHERE slug = ?').run(path ?? null, slug);
+  }
+
   /** The pages a source holds, in the order the registry declared them. */
   pagesFor(sourceId: number): PageRow[] {
     const rows = this.db

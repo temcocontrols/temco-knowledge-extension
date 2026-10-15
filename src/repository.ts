@@ -32,6 +32,21 @@ const MATERIAL_LIMIT = 12_000;
 /** How many files are offered to pick from, so the list stays a list. */
 const FILE_LIMIT = 2_000;
 
+/** A file a page could be written from: its path, and roughly what it costs to read. */
+export interface CodeFile {
+  path: string;
+  /** Bytes, as the disk or the tree call reports them — what the running count in the form is made of. */
+  size: number;
+}
+
+/** Several files' text, within a budget: what a draft is given, and what was left out. */
+export interface Material {
+  text: string;
+  included: string[];
+  skipped: string[];
+  characters: number;
+}
+
 /** One row of the organisation's list. */
 export interface RepositoryRow {
   name: string;
@@ -107,7 +122,7 @@ export async function listRepositories(
 export async function codeFiles(
   context: vscode.ExtensionContext,
   source: RepositorySource
-): Promise<{ files: string[]; note?: string }> {
+): Promise<{ files: CodeFile[]; note?: string }> {
   if (source.path !== undefined && source.path.length > 0) {
     return localCodeFiles(source.path);
   }
@@ -133,16 +148,53 @@ export async function codeFiles(
     return { files: [], note: `GitHub answered ${response.status} ${response.statusText} for the file list` };
   }
 
-  const body = (await response.json()) as { tree?: { path?: string; type?: string }[] };
+  const body = (await response.json()) as { tree?: { path?: string; size?: number; type?: string }[] };
   const found = (body.tree ?? [])
     .filter((entry) => entry.type === 'blob' && typeof entry.path === 'string' && isCode(entry.path))
-    .map((entry) => entry.path as string)
-    .sort();
+    .map((entry) => ({ path: entry.path as string, size: Math.max(0, Number(entry.size ?? 0)) }))
+    .sort((left, right) => left.path.localeCompare(right.path));
 
   return {
     files: found.slice(0, FILE_LIMIT),
     note: found.length > FILE_LIMIT ? `the first ${FILE_LIMIT} of ${found.length} files` : undefined,
   };
+}
+
+/**
+ * The text of the files a person ticked, within one budget.
+ *
+ * The order is theirs, and the budget is a real limit rather than a hope: a file that would cross it is left out
+ * and named, so what the model was given is exactly what the form says it was given. `src/newPagePage.ts` shows
+ * the same list, from this answer.
+ */
+export async function readMaterials(
+  context: vscode.ExtensionContext,
+  source: RepositorySource,
+  files: readonly string[],
+  limit = MATERIAL_LIMIT
+): Promise<Material> {
+  const included: string[] = [];
+  const skipped: string[] = [];
+  const parts: string[] = [];
+  let characters = 0;
+
+  for (const file of files) {
+    const read = await readCodeFile(context, source, file);
+    if ('error' in read) {
+      skipped.push(file);
+      continue;
+    }
+    const block = `\n---- ${file} ----\n${read.text}`;
+    if (characters + block.length > limit) {
+      skipped.push(file);
+      continue;
+    }
+    characters += block.length;
+    parts.push(block);
+    included.push(file);
+  }
+
+  return { text: parts.join('\n').trim(), included, skipped, characters };
 }
 
 /** One file's text, for the model to draft from. Truncated, and it says so rather than pretending. */
@@ -196,7 +248,7 @@ export async function readCodeFile(
 
 // ------------------------------------------------------------------ the two ways in
 
-async function localCodeFiles(folder: string): Promise<{ files: string[]; note?: string }> {
+async function localCodeFiles(folder: string): Promise<{ files: CodeFile[]; note?: string }> {
   let found: vscode.Uri[];
   try {
     found = await vscode.workspace.findFiles(
@@ -208,10 +260,21 @@ async function localCodeFiles(folder: string): Promise<{ files: string[]; note?:
     return { files: [], note: `${folder} could not be searched: ${reason(error)}` };
   }
 
-  const files = found
-    .map((uri) => path.relative(folder, uri.fsPath).split(path.sep).join('/'))
-    .filter((file) => isCode(file))
-    .sort();
+  const files: CodeFile[] = [];
+  for (const uri of found) {
+    const relative = path.relative(folder, uri.fsPath).split(path.sep).join('/');
+    if (!isCode(relative)) {
+      continue;
+    }
+    let size = 0;
+    try {
+      size = (await fs.stat(uri.fsPath)).size;
+    } catch {
+      // A file that vanished between the listing and the stat is not worth reporting: it cannot be read either.
+    }
+    files.push({ path: relative, size });
+  }
+  files.sort((left, right) => left.path.localeCompare(right.path));
 
   return {
     files: files.slice(0, FILE_LIMIT),

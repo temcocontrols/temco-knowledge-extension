@@ -33,6 +33,7 @@ import { fileColumn } from './surface';
 import { DocsRoot, DeclaredPage, RegistryError, collectPages, countStale, folderForPath, loadDocsRoot, registryUriFor, rootFromDeclared, totals } from './registry';
 import { KnowledgeNode, KnowledgeTreeProvider, TreeNote, pageFromNode } from './tree';
 import { LIBRARY_VIEW_ID, registerSectionViews } from './views';
+import { registerWorkareaCommands } from './workarea';
 
 const OUTPUT_NAME = 'Temco Knowledge';
 const VIEW_ID = 'temcoKnowledge.pages';
@@ -337,6 +338,8 @@ export function activate(context: vscode.ExtensionContext): void {
   registerProjectCommands(context, selection, () => void refresh());
   registerProjectBuildCommands(context, output);
   registerReadCommands(context, selection, output, () => void refresh());
+  // The working area: cloning a source so its files can be read, and pulling it when it has moved on.
+  registerWorkareaCommands(context, selection, output, () => void refresh());
   // The Markdown toolbar: it edits the page in front, and reads the registry only to offer a link to a real
   // page — the one write-side surface in this extension that writes nothing.
   registerFormatCommands(context, () => roots);
@@ -351,6 +354,26 @@ export function activate(context: vscode.ExtensionContext): void {
   newPagePage = new NewPagePage(context, () => roots, pageDeps);
   context.subscriptions.push(
     vscode.commands.registerCommand('temcoKnowledge.repositories', () => repositories.open()),
+    // *Analyse the source…* from a row: the form knows the source by the name the tree shows it under, while a
+    // row carries its slug, so the catalog is asked which name that slug is.
+    vscode.commands.registerCommand('temcoKnowledge.analyseSource', async (target?: unknown) => {
+      const slug = typeof target === 'string' ? target : (target as { slug?: string } | undefined)?.slug;
+      if (slug === undefined) {
+        return;
+      }
+      let catalog: Catalog | undefined;
+      try {
+        catalog = await Catalog.open(context);
+        const source = catalog.source(slug);
+        if (source !== undefined) {
+          newPagePage?.open({ source: source.name, analyse: true });
+        }
+      } catch {
+        // Nothing to analyse: the page itself says when a source has no files to read.
+      } finally {
+        catalog?.close();
+      }
+    }),
     { dispose: () => { repositories.dispose(); newPagePage?.dispose(); } }
   );
   redraw = () => void refresh();

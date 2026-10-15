@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 
 /** Bumped whenever a file under `prompts/` changes, so a draft can be traced to the instructions behind it. */
-export const PROMPT_VERSION = 'ai-v3';
+export const PROMPT_VERSION = 'ai-v4';
 
 const TEMPLATE_FOLDER = 'prompts';
 const loaded = new Map<string, string>();
@@ -150,6 +150,26 @@ export function newPagePrompt(
     path: page.path,
     area: page.area.trim() || '(this is the first page here)',
     material: page.material.trim() || '(nothing was chosen)',
+  });
+}
+
+/**
+ * What documentation a repository is missing.
+ *
+ * The material is file **paths** and the titles of the pages that already exist — never file contents, so the
+ * model cannot describe what it has not read; that is the next step, and it happens in `newpage.md` after a
+ * person has chosen which files a page is written from.
+ */
+export function analysePrompt(
+  context: vscode.ExtensionContext,
+  source: { name: string; files: readonly string[]; pages: readonly string[]; note: string }
+): string {
+  return fill(template(context, 'analyse'), {
+    source: source.name,
+    count: String(source.files.length),
+    files: source.files.length === 0 ? '(no files were listed)' : source.files.join('\n'),
+    pages: source.pages.length === 0 ? '(none yet)' : source.pages.map((page) => `- ${page}`).join('\n'),
+    note: source.note.trim() || '(nothing more)',
   });
 }
 

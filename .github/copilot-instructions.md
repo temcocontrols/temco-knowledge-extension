@@ -46,7 +46,10 @@ belong to the **product** repository, which keeps the content and the publishing
    kind's heading skeleton — the registry entry for it is added by the repository's own `docs:registry`, never by
    us; (d) **one curated value** in an existing `registry.json` — a title, an order, a chapter, a retirement —
    through `src/registryEdit.ts`, which renders the file the way its own generator does (same indentation, same
-   line endings), so the diff is the lines that actually changed. Nothing under `_admin/` or `_edit/` is ever
+   line endings), so the diff is the lines that actually changed; (e) **the working area** — a folder of our own
+   outside every repository (`temcoKnowledge.workspaceFolder`, default `~/TemcoKnowledge`) where a source is
+   cloned and pulled and where what we make is written. Cloning is never automatic; *nothing is ever written to
+   the origin and nothing is ever pushed*. Nothing under `_admin/` or `_edit/` is ever
    written, `registry.json` is never rewritten wholesale, a page's **file is never renamed or moved** (the page
    id is its path — `05-content-and-registry.md` rule 1), and nothing is ever committed on the user's behalf.
    `docs/editor-design.md` §5 records the decision and the checks behind it.
@@ -86,6 +89,7 @@ src/home.ts          the dashboard · src/projectsPage.ts the list · src/projec
 src/projectPage.ts   create or edit a project · src/needsPage.ts what needs doing · src/aiPage.ts the AI
 src/read.ts          reading a source (local · api) and recording what it found
 src/repository.ts    the repository side of a source: the organisation's list · its code files · one file's text
+src/workarea.ts      where local copies live: clone · pull · open · remove, and the folder we own
 src/newPagePage.ts   the form that creates a page (where · what · kind · name · what to draft from · preview)
 src/repositoriesPage.ts  the organisation's repositories, and *Start* on one: cite it, then read it
 src/catalog/         schema.ts (the tables) · store.ts (node:sqlite, in the extension's own storage,
@@ -96,7 +100,7 @@ src/ai/              catalog.ts (what can be downloaded), install.ts (download/v
                      panel.ts (the AI panel), commands.ts (the model list + AI status)
 media/               knowledge.svg (the activity-bar icon); ai-panel.js/.css (the AI panel)
 prompts/             the instruction text the AI receives (system.md, ask.md, draft.md, area.md,
-                     newpage.md — the one prompt whose material may be a code file)
+                     newpage.md — the one prompt whose material may be a code file — analyse.md)
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
 

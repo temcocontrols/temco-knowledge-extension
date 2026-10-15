@@ -166,6 +166,41 @@
         "icon": "$(github)"
       },
       {
+        "command": "temcoKnowledge.fetchSource",
+        "title": "Fetch the Local Copy",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "temcoKnowledge.pullSource",
+        "title": "Pull the Local Copy",
+        "icon": "$(repo-pull)"
+      },
+      {
+        "command": "temcoKnowledge.openClone",
+        "title": "Open the Local Copy",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "temcoKnowledge.removeClone",
+        "title": "Remove the Local Copy",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "temcoKnowledge.openWorkFolder",
+        "title": "Open the Working Folder",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "temcoKnowledge.changeWorkspaceFolder",
+        "title": "Change Where Local Copies Live",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "temcoKnowledge.analyseSource",
+        "title": "Analyse the Source…",
+        "icon": "$(lightbulb)"
+      },
+      {
         "command": "temcoKnowledge.feedback",
         "title": "Feedback by Owner",
         "icon": "$(comment-discussion)"
@@ -640,6 +675,36 @@
           "group": "1_read@4"
         },
         {
+          "command": "temcoKnowledge.fetchSource",
+          "when": "view == temcoKnowledge.library",
+          "group": "1_read@5"
+        },
+        {
+          "command": "temcoKnowledge.pullSource",
+          "when": "view == temcoKnowledge.library",
+          "group": "1_read@6"
+        },
+        {
+          "command": "temcoKnowledge.openClone",
+          "when": "view == temcoKnowledge.library",
+          "group": "1_read@7"
+        },
+        {
+          "command": "temcoKnowledge.analyseSource",
+          "when": "view == temcoKnowledge.library",
+          "group": "2_work@3"
+        },
+        {
+          "command": "temcoKnowledge.openWorkFolder",
+          "when": "view == temcoKnowledge.library",
+          "group": "3_run@3"
+        },
+        {
+          "command": "temcoKnowledge.changeWorkspaceFolder",
+          "when": "view == temcoKnowledge.library",
+          "group": "3_run@4"
+        },
+        {
           "command": "temcoKnowledge.readAllSources",
           "when": "view == temcoKnowledge.library",
           "group": "1_read@1"
@@ -855,6 +920,36 @@
           "command": "temcoKnowledge.setToken",
           "when": "view == temcoKnowledge.library && viewItem == repositories",
           "group": "2_token@1"
+        },
+        {
+          "command": "temcoKnowledge.fetchSource",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "1_local@1"
+        },
+        {
+          "command": "temcoKnowledge.pullSource",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "1_local@2"
+        },
+        {
+          "command": "temcoKnowledge.openClone",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "1_local@3"
+        },
+        {
+          "command": "temcoKnowledge.removeClone",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "1_local@4"
+        },
+        {
+          "command": "temcoKnowledge.analyseSource",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "2_analyse@1"
+        },
+        {
+          "command": "temcoKnowledge.openWorkFolder",
+          "when": "view == temcoKnowledge.library && viewItem == source",
+          "group": "1_local@5"
         }
       ]
     },
@@ -914,6 +1009,11 @@
           "type": "string",
           "default": "temcocontrols",
           "markdownDescription": "The GitHub organisation the dashboard links to for a starting point. Nothing is read from it automatically."
+        },
+        "temcoKnowledge.workspaceFolder": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Where local copies of sources are cloned, and where what we make from them is written. Empty means `~/TemcoKnowledge`. It is outside every repository on purpose: **nothing is ever written to a source, and nothing is ever pushed**."
         }
       }
     }

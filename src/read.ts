@@ -18,6 +18,7 @@ import { slugOf } from './projectPage';
 import { Selection } from './selected';
 import { fileColumn } from './surface';
 import { rowSlug } from './views';
+import { hasClone } from './workarea';
 
 const REGISTRY_TAIL = ['docs', 'help', 'registry.json'];
 const TOKEN_SECRET = 'temcoKnowledge.githubToken';
@@ -30,10 +31,10 @@ export function registerReadCommands(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('temcoKnowledge.readSource', (target?: unknown) =>
-      readSource(context, output, refresh, rowSlug(target))
+      readSource(context, selection, output, refresh, rowSlug(target))
     ),
     vscode.commands.registerCommand('temcoKnowledge.readAllSources', (target?: unknown) =>
-      readAllSources(context, output, refresh, rowSlug(target))
+      readAllSources(context, selection, output, refresh, rowSlug(target))
     ),
     vscode.commands.registerCommand('temcoKnowledge.removeSource', (target?: unknown) =>
       removeSource(context, refresh, rowSlug(target))
@@ -60,6 +61,7 @@ export function registerReadCommands(
  */
 async function readAllSources(
   context: vscode.ExtensionContext,
+  selection: Selection,
   output: vscode.OutputChannel,
   refresh: () => void,
   /** A project's slug: read only what *it* cites. Nothing means every source that has never been read. */
@@ -99,7 +101,7 @@ async function readAllSources(
     async (progress) => {
       for (const [index, source] of wanted.entries()) {
         progress.report({ message: `${source.name} (${index + 1} of ${wanted.length})` });
-        await readSource(context, output, refresh, source.slug, true);
+        await readSource(context, selection, output, refresh, source.slug, true);
       }
     }
   );
@@ -273,6 +275,7 @@ async function openFile(selection: Selection, target?: unknown): Promise<void> {
 
 async function readSource(
   context: vscode.ExtensionContext,
+  selection: Selection,
   output: vscode.OutputChannel,
   refresh: () => void,
   wanted?: string,
@@ -344,9 +347,34 @@ async function readSource(
     refresh();
 
     if (!quiet) {
-      void vscode.window.showInformationMessage(
-        `Temco Knowledge: ${source.name} — ${found.note ?? `${found.pages.length} pages read`}.`
-      );
+      // Two things can be worth saying after a read, and neither is an error.
+      if (found.pages.length === 0 && found.note !== undefined && /no docs\/help\/registry\.json/.test(found.note)) {
+        // A source without a registry is not a broken one: it is material rather than pages — a code
+        // repository, which is exactly what a new page can be written from. Say which it is.
+        void vscode.window.showInformationMessage(
+          `Temco Knowledge: ${source.name} has no registry of its own, so it is material rather than pages — ` +
+            'a page is written from its files, not read from it.'
+        );
+      } else {
+        void vscode.window.showInformationMessage(
+          `Temco Knowledge: ${source.name} — ${found.note ?? `${found.pages.length} pages read`}.`
+        );
+      }
+
+      // A local copy is never made behind anyone's back: this says that one would help, and offers it.
+      if (source.path === undefined && (source.remoteUrl ?? '').length > 0 && !(await hasClone(selection.project() ?? '', source.name))) {
+        void vscode.window
+          .showInformationMessage(
+            `Temco Knowledge: ${source.name} is read over the API. A local copy lets the AI read its files and its history, ` +
+              'and no longer touches the repository itself.',
+            'Fetch it now'
+          )
+          .then((answer) => {
+            if (answer === 'Fetch it now') {
+              void vscode.commands.executeCommand('temcoKnowledge.fetchSource', slug);
+            }
+          });
+      }
     }
   } catch (error) {
     void vscode.window.showErrorMessage(`Temco Knowledge: ${String(error)}`);

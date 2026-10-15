@@ -200,6 +200,27 @@
   and `12-ai-features.md`'s bargain still holds: the model makes the human's edit smaller.
 - **`src/repository.ts` is new**: the organisation's list, a source's code files, and one file's text — from a
   folder or from a repository with no clone — with every refusal returned as a sentence to show, never thrown.
+- **The working area: a source can be cloned, so its files can be read.** `src/workarea.ts` owns a folder of our
+  own — `temcoKnowledge.workspaceFolder`, default `~/TemcoKnowledge`, visible on purpose — laid out as
+  `<project>/<source>/` for the clone and `<project>/work/` for what we make. **Fetch** clones one branch with
+  full history (the history is what a draft reads and what a stale check needs, so no `--depth 1`), **Pull**
+  freshens it with `--ff-only`, **Open** reveals it and **Remove** deletes the copy alone. After a clone the
+  catalog records where the copy is, so the source is read from disk from then on — the same read, with a working
+  tree behind it. Cloning is **never automatic**: a first read says a local copy would help and offers one, and
+  from then on every act is a menu entry or a page button that names the folder first. Nothing is ever written to
+  the origin, and nothing is ever pushed.
+- **A source without a registry is material, not a broken page set.** A code repository has no
+  `docs/help/registry.json` — that file belongs to the project being written, not to every source — so a read of
+  one now says so instead of repeating git's own sentence, and the offer to fetch a local copy follows it.
+- **A draft can be written from several files.** The form lists the source's code files with ticks, a filter and
+  a running count of what the ticks cost, and the model is given them in order inside a 12 000-character budget —
+  whatever did not fit is named in the draft's own footer, so what the model saw is what the form says it saw.
+- **The source can be analysed.** *Analyse the source* (a button on the form, and an entry on a source row) gives
+  the model the **file list** and the titles of the pages that already exist, and asks what pages are missing.
+  Each proposal says its title, its kind and the files it would be written from; clicking one fills the form, and
+  the ordinary draft-and-write path takes it from there. The files a model names are checked against the list it
+  was given, so a suggestion can only ever name files that are really there. `prompts/analyse.md` is new and
+  `PROMPT_VERSION` is `ai-v4`.
 - **The Workspace view's toolbar.** *New page* · *New chapter* · *Refresh* inline, and the rest in its `…`: the
   page acts, the kind submenu, the registry, Home and Validate. It is the Library's shape, and a `…` in a title
   bar opens **where it is** — which a list started from a row can never do.

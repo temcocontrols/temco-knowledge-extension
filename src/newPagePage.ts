@@ -18,7 +18,7 @@
 
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { newPagePrompt, systemPrompt } from './ai/prompts';
+import { analysePrompt, newPagePrompt, systemPrompt } from './ai/prompts';
 import { complete, aiStatus } from './ai/runtime';
 import { DocsRoot, PageEntry, collectPages } from './registry';
 import {
@@ -29,7 +29,7 @@ import {
   PageDeps,
   writePage,
 } from './pageOps';
-import { codeFiles, readCodeFile, RepositorySource } from './repository';
+import { codeFiles, readMaterials, RepositorySource } from './repository';
 import { NEW_PAGE_VIEW_TYPE, pageColumn } from './surface';
 
 /** How much of another page may be given to the model, so one huge page cannot fill the window. */
@@ -38,10 +38,11 @@ const MATERIAL_CHARS = 12_000;
 interface FormMessage {
   type?: string;
   source?: string;
-  file?: string;
+  files?: string[];
   from?: string;
   spec?: NewPageSpec;
   pageId?: string;
+  note?: string;
 }
 
 /** What the form is told about one writable source. */
@@ -99,6 +100,7 @@ export class NewPagePage {
       kinds: KINDS.map((kind) => ({ label: kind.label, detail: kind.detail, headings: kind.headings })),
       areaChapter: AREA_CHAPTER,
       model: modelLabel(this.context),
+      analyse: this.seed.analyse === true,
     });
   }
 
@@ -136,6 +138,9 @@ export class NewPagePage {
       case 'files':
         await this.files(message.source ?? '');
         return;
+      case 'analyse':
+        await this.analyse(message.source ?? '', message.note ?? '');
+        return;
       case 'draft':
         await this.draft(message);
         return;
@@ -149,6 +154,66 @@ export class NewPagePage {
         return;
       default:
         return;
+    }
+  }
+
+  /**
+   * What documentation this source is missing, from its file list and the pages that already exist.
+   *
+   * The model is given paths, never contents — a proposal to write a page, not a page. Each suggestion the form
+   * shows fills the fields when it is clicked, and the ordinary draft-and-write path takes it from there.
+   */
+  private async analyse(source: string, note: string): Promise<void> {
+    const panel = this.panel;
+    const root = this.roots().find((candidate) => candidate.folder.name === source);
+    if (!panel || root === undefined) {
+      return;
+    }
+    if (modelLabel(this.context) === undefined) {
+      await panel.webview.postMessage({
+        type: 'analyseError',
+        message: 'No local model is chosen. Download one on the AI page, then analyse again.',
+      });
+      return;
+    }
+
+    const listed = await codeFiles(this.context, repositorySource(root));
+    if (listed.files.length === 0) {
+      await panel.webview.postMessage({
+        type: 'analyseError',
+        message: listed.note ?? 'This source has no code files that can be read.',
+      });
+      return;
+    }
+
+    await panel.webview.postMessage({ type: 'analyseStart' });
+    const prompt = analysePrompt(this.context, {
+      name: root.folder.name,
+      // Paths only, and only the first few hundred: a proposal is about what the repository *has*, not about
+      // the contents of every file, and a small local model has a small window.
+      files: listed.files.slice(0, 600).map((file) => file.path),
+      pages: collectPages(root).map((page) => `${page.title} (\`${page.id}\`)`),
+      note,
+    });
+
+    try {
+      const answer = await complete(
+        this.context,
+        [
+          { role: 'system', content: systemPrompt(this.context, undefined) },
+          { role: 'user', content: prompt },
+        ],
+        { maxTokens: 700 }
+      );
+      await panel.webview.postMessage({
+        type: 'suggestions',
+        items: suggestions(answer, listed.files),
+      });
+    } catch (error) {
+      await panel.webview.postMessage({
+        type: 'analyseError',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -251,11 +316,20 @@ export class NewPagePage {
       .join('\n\n');
 
     if (message.from === 'file') {
-      if (message.file === undefined || message.file.length === 0) {
+      const chosen = message.files ?? [];
+      if (chosen.length === 0) {
         return { error: 'No file was chosen to draft from.' };
       }
-      const file = await readCodeFile(this.context, repositorySource(root), message.file);
-      return 'error' in file ? { error: file.error } : { text: `# ${message.file}\n\n${file.text}`, area: listed };
+      const materials = await readMaterials(this.context, repositorySource(root), chosen);
+      if (materials.included.length === 0) {
+        return { error: 'None of the chosen files could be read.' };
+      }
+      return {
+        text: `${materials.text}\n\n… ${materials.included.length} file(s), ${materials.characters} characters${
+          materials.skipped.length > 0 ? `, ${materials.skipped.length} left out to stay within the budget` : ''
+        } …`,
+        area: listed,
+      };
     }
 
     if (message.from === 'page') {
@@ -277,6 +351,51 @@ export class NewPagePage {
       await panel?.webview.postMessage({ type: 'written', relative: written.relative });
     }
   }
+}
+
+/**
+ * The pages a model proposed, as far as they are real.
+ *
+ * A small local model writes roughly what it was asked for and sometimes not: a line that is not
+ * `title | kind | files` is dropped, a kind that does not exist becomes *Article*, and a file that is not in the
+ * list the model was given is dropped too — so a suggestion can only ever name files that are really there. The
+ * form shows the result, and the person clicks one.
+ */
+function suggestions(
+  answer: string,
+  files: readonly { path: string }[]
+): { title: string; kind: string; files: string[] }[] {
+  const known = new Set(files.map((file) => file.path));
+  const items: { title: string; kind: string; files: string[] }[] = [];
+
+  for (const line of answer.split('\n')) {
+    const match = /^\s*[-*\d.]*\s*(.+?)\s*\|\s*([^|]+?)\s*\|\s*(.*)$/.exec(line);
+    if (!match) {
+      continue;
+    }
+    const title = match[1].replace(/^[\s*#-]+|[\s*]+$/g, '').trim();
+    if (title.length === 0 || title.length > 80) {
+      continue;
+    }
+    const wanted = match[2].trim().toLowerCase();
+    const kind =
+      KINDS.find((candidate) => candidate.label.toLowerCase() === wanted) ??
+      KINDS.find((candidate) => candidate.label.toLowerCase().startsWith(wanted.slice(0, 5))) ??
+      KINDS[0];
+    const chosen = match[3]
+      .split(',')
+      .map((one) => one.trim().replace(/^`|`$/g, ''))
+      .filter((one) => known.has(one));
+    items.push({ title, kind: kind.label, files: chosen });
+  }
+
+  // One proposal per title, and a list a person can read: the model is asked for a handful and may return more.
+  return items
+    .filter(
+      (item, index) =>
+        items.findIndex((other) => other.title.toLowerCase() === item.title.toLowerCase()) === index
+    )
+    .slice(0, 12);
 }
 
 /** The model in use, or nothing — what the form needs to know before it offers to draft. */
@@ -339,6 +458,17 @@ function html(script: string): string {
     .fields { display: flex; gap: 1.6em; flex-wrap: wrap; }
     label.field { display: flex; flex-direction: column; gap: .25em; min-width: 0; flex: 0 1 22em; }
     label.field span { color: var(--vscode-descriptionForeground); }
+    label.field.wide { flex: 1 1 100%; }
+    .ticks { max-height: 14em; overflow: auto; border: 1px solid var(--vscode-panel-border); border-radius: 2px;
+             padding: .3em .5em; background: var(--vscode-input-background); }
+    .ticks label { display: flex; gap: .5em; align-items: baseline; padding: .1em 0; cursor: pointer; }
+    .ticks .size { color: var(--vscode-descriptionForeground); margin-left: auto; }
+    .card { border: 1px solid var(--vscode-panel-border); border-radius: 4px; padding: .7em .9em;
+            margin: .5em 0; max-width: 78em; }
+    .card .top { display: flex; gap: .8em; align-items: baseline; flex-wrap: wrap; }
+    .card .name { font-weight: 600; }
+    .card .tags { color: var(--vscode-descriptionForeground); flex: 1 1 auto; }
+    .card .do { margin: .5em 0 0; }
     select, input[type=text] { padding: .35em .55em; font-family: inherit; font-size: inherit;
            color: var(--vscode-input-foreground); background: var(--vscode-input-background);
            border: 1px solid var(--vscode-input-border, transparent); border-radius: 2px; min-width: 0; }
@@ -432,13 +562,22 @@ function html(script: string): string {
         <span class="detail">adapt a page that already says something close</span></span></label>
     </div>
     <div class="fields" id="pickers" hidden>
-      <label class="field" id="filesField" hidden><span>File</span>
+      <label class="field wide" id="filesField" hidden><span>Tick every file this page should be written from</span>
         <input type="text" id="fileFilter" placeholder="Filter files…">
-        <select id="file" size="8"></select>
-        <span class="note" id="filesNote"></span></label>
+        <div class="ticks" id="fileList"></div>
+        <span class="note" id="filesNote"></span>
+        <span class="note" id="fileCount"></span></label>
       <label class="field" id="pagesField" hidden><span>Page</span><select id="page" size="8"></select>
         <span class="note" id="pagesNote"></span></label>
     </div>
+
+    <h2>What is missing</h2>
+    <div class="do">
+      <button id="analyse">Analyse the source</button>
+      <span class="note">The model is given the file list and the pages that already exist, and proposes the
+        pages this source is missing. Clicking one fills this form.</span>
+    </div>
+    <div id="suggestions"></div>
 
     <div class="do">
       <button id="draft">Draft it with the AI</button>
@@ -465,7 +604,8 @@ let kinds = [];
 let areaChapter = '(root)';
 let seed = {};
 let files = [];
-let pages = [];
+let ticked = new Set();
+let listed = [];
 let draft = '';
 
 window.addEventListener('message', (event) => {
@@ -480,10 +620,22 @@ window.addEventListener('message', (event) => {
   }
   if (message.type === 'files') {
     files = message.files || [];
-    $('file').replaceChildren(...files.map(option));
     $('filesNote').textContent = files.length === 0
       ? (message.note || 'No code files were found in this source.')
       : files.length + ' file' + (files.length === 1 ? '' : 's') + (message.note ? ' · ' + message.note : '');
+    drawFiles();
+    return;
+  }
+  if (message.type === 'analyseStart') {
+    $('suggestions').replaceChildren(tell('Reading the file list…'));
+    return;
+  }
+  if (message.type === 'suggestions') {
+    drawSuggestions(message.items || []);
+    return;
+  }
+  if (message.type === 'analyseError') {
+    $('suggestions').replaceChildren(warn(message.message));
     return;
   }
   if (message.type === 'draftStart') {
@@ -547,6 +699,11 @@ function accept(message) {
   if (radio) { radio.checked = true; }
   drawFrom();
   drawPath();
+
+  // Asked for by an entry in the tree: the analysis runs as soon as the form can show its answer.
+  if (message.analyse) {
+    $('analyse').click();
+  }
 }
 
 function drawAreas() {
@@ -647,12 +804,99 @@ function drawFrom() {
     vscode.postMessage({ type: 'files', source: $('source').value });
   }
   if (from === 'page') {
-    const listed = areaPages();
-    $('page').replaceChildren(...listed.map((page) => withValue(option(page.title + '  (' + page.id + ')'), page.id)));
-    $('pagesNote').textContent = listed.length === 0
+    const listed_ = areaPages();
+    $('page').replaceChildren(...listed_.map((page) => withValue(option(page.title + '  (' + page.id + ')'), page.id)));
+    $('pagesNote').textContent = listed_.length === 0
       ? 'This area has no pages yet, so there is nothing to adapt.'
-      : listed.length + ' page' + (listed.length === 1 ? '' : 's') + ' in this area.';
+      : listed_.length + ' page' + (listed_.length === 1 ? '' : 's') + ' in this area.';
   }
+}
+
+/** The tick list: every code file the source has, filtered as the person types, with what the ticks cost. */
+function drawFiles() {
+  const needle = $('fileFilter').value.trim().toLowerCase();
+  const shown = files.filter((file) => needle.length === 0 || file.path.toLowerCase().includes(needle));
+  const rows = shown.slice(0, 400).map((file) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = ticked.has(file.path);
+    input.addEventListener('change', () => {
+      if (input.checked) { ticked.add(file.path); } else { ticked.delete(file.path); }
+      drawCount();
+    });
+    const text = document.createElement('span');
+    text.textContent = file.path;
+    const size = document.createElement('span');
+    size.className = 'size';
+    size.textContent = file.size >= 1024 ? Math.round(file.size / 1024) + ' KB' : file.size + ' B';
+    label.append(input, text, size);
+    return label;
+  });
+  $('fileList').replaceChildren(...rows);
+  if (shown.length > rows.length) {
+    $('fileList').append(tell('… and ' + (shown.length - rows.length) + ' more in this source.'));
+  }
+  drawCount();
+}
+
+/** What the ticks amount to: the model is given a budget, and a tick list is what chooses inside it. */
+function drawCount() {
+  const chosen = files.filter((file) => ticked.has(file.path));
+  const bytes = chosen.reduce((total, file) => total + file.size, 0);
+  $('fileCount').textContent = chosen.length + ' ticked · about ' + bytes.toLocaleString() +
+    ' bytes of text, and the model is given at most 12 000 characters — the rest are left out and named.';
+}
+
+/** The proposed pages: clicking one fills the form, so a suggestion ends in the ordinary write. */
+function drawSuggestions(items) {
+  if (items.length === 0) {
+    $('suggestions').replaceChildren(tell('Nothing was proposed — the file list may be too thin to go on, or ' +
+      'everything it holds is already documented.'));
+    return;
+  }
+  const cards = items.map((item) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const top = document.createElement('div');
+    top.className = 'top';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = item.title;
+    const tags = document.createElement('span');
+    tags.className = 'tags';
+    tags.textContent = item.kind + (item.files.length > 0 ? ' · ' + item.files.length + ' file(s)' : '');
+    top.append(name, tags);
+    const filesLine = document.createElement('p');
+    filesLine.className = 'note';
+    filesLine.textContent = item.files.length > 0 ? item.files.join(', ') : 'no file was chosen';
+    const do_ = document.createElement('div');
+    do_.className = 'do';
+    const use = document.createElement('button');
+    use.className = 'primary';
+    use.textContent = 'Use this';
+    use.addEventListener('click', () => fillFrom(item));
+    do_.append(use);
+    card.append(top, filesLine, do_);
+    return card;
+  });
+  $('suggestions').replaceChildren(...cards);
+}
+
+/** A suggestion, in the form: the title, the kind, the files ticked, and *from a file* chosen. */
+function fillFrom(item) {
+  $('title').value = item.title;
+  $('slug').value = slugify(item.title);
+  $('slug').dataset.touched = 'yes';
+  drawKinds(item.kind);
+  const radio = document.querySelector('input[name=from][value=file]');
+  if (radio) { radio.checked = true; }
+  drawFrom();
+  drawPath();
+  // The files the model named are the ones it read the list from, so tick exactly those.
+  ticked = new Set(files.filter((file) => item.files.includes(file.path)).map((file) => file.path));
+  drawFiles();
+  $('draft').scrollIntoView({ block: 'center' });
 }
 
 /** Exactly what the extension will write, from the same fields. */
@@ -679,12 +923,10 @@ $('title').addEventListener('input', () => {
   }
   drawPath();
 });$('slug').addEventListener('input', () => { $('slug').dataset.touched = 'yes'; drawPath(); });
-$('fileFilter').addEventListener('input', () => {
-  const needle = $('fileFilter').value.trim().toLowerCase();
-  $('file').replaceChildren(...files.filter((file) => file.toLowerCase().includes(needle)).map(option));
-});
+$('fileFilter').addEventListener('input', drawFiles);
 document.querySelectorAll('input[name=mode]').forEach((input) => input.addEventListener('change', drawMode));
 document.querySelectorAll('input[name=from]').forEach((input) => input.addEventListener('change', drawFrom));
+$('analyse').addEventListener('click', () => vscode.postMessage({ type: 'analyse', source: $('source').value }));
 
 $('draft').addEventListener('click', () => {
   const from = document.querySelector('input[name=from]:checked').value;
@@ -696,7 +938,7 @@ $('draft').addEventListener('click', () => {
   vscode.postMessage({
     type: 'draft',
     from,
-    file: $('file').value,
+    files: [...ticked],
     pageId: $('page').value,
     spec: chosen,
   });

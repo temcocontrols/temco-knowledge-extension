@@ -83,6 +83,8 @@ export interface NewPageSeed {
   kind?: string;
   /** True when the act was *New chapter*: the page opens ready to make a folder and its first page. */
   chapterMode?: boolean;
+  /** True when the page should ask the model what this source is missing as soon as it opens. */
+  analyse?: boolean;
 }
 
 /** One page to write, complete. */

@@ -17,6 +17,7 @@ import { slugOf } from './projectPage';
 import { REPOSITORIES_VIEW_TYPE, pageColumn } from './surface';
 import { Selection } from './selected';
 import { RepositoryRow, listRepositories } from './repository';
+import { cloneSize, hasClone } from './workarea';
 
 interface RepositoriesMessage {
   type?: string;
@@ -91,11 +92,21 @@ export class RepositoriesPage {
       return;
     }
     this.listed = result.repositories;
+    // Which of them already has a local copy, so the page offers *Fetch* or *Pull* rather than both.
+    const copies: Record<string, string | undefined> = {};
+    if (project !== undefined) {
+      for (const row of result.repositories) {
+        if (await hasClone(project, row.name)) {
+          copies[row.name] = (await cloneSize(project, row.name)) ?? '';
+        }
+      }
+    }
     await panel.webview.postMessage({
       type: 'seed',
       org,
       project,
       cited,
+      copies,
       truncated: result.truncated,
       repositories: result.repositories,
     });
@@ -119,10 +130,27 @@ export class RepositoriesPage {
       case 'start':
         await this.start(message.name ?? '');
         return;
+      case 'fetch':
+        // Fetching a repository that was never started makes it a source first: a clone belongs to a source.
+        await this.cite(message.name ?? '');
+        await vscode.commands.executeCommand('temcoKnowledge.fetchSource', slugOf(message.name ?? ''));
+        await this.send();
+        return;
+      case 'pull':
+        await vscode.commands.executeCommand('temcoKnowledge.pullSource', slugOf(message.name ?? ''));
+        await this.send();
+        return;
       case 'open':
         if (message.url !== undefined) {
           await vscode.env.openExternal(vscode.Uri.parse(message.url));
         }
+        return;
+      case 'openClone':
+        await vscode.commands.executeCommand('temcoKnowledge.openClone', slugOf(message.name ?? ''));
+        return;
+      case 'removeClone':
+        await vscode.commands.executeCommand('temcoKnowledge.removeClone', slugOf(message.name ?? ''));
+        await this.send();
         return;
       case 'copy':
         await vscode.env.clipboard.writeText(message.text ?? '');
@@ -132,6 +160,33 @@ export class RepositoriesPage {
         return;
       default:
         return;
+    }
+  }
+
+  /** Records a repository as a source of the project being worked on, without reading it. */
+  private async cite(name: string): Promise<void> {
+    const row = this.listed.find((candidate) => candidate.name === name);
+    const project = this.selection.project();
+    if (row === undefined || project === undefined) {
+      return;
+    }
+    let catalog: Catalog | undefined;
+    try {
+      catalog = await Catalog.open(this.context);
+      const slug = slugOf(row.name);
+      catalog.addSource({
+        kind: 'git',
+        name: row.name,
+        slug,
+        remoteUrl: row.cloneUrl,
+        defaultBranch: row.defaultBranch,
+      });
+      const cited = catalog.documentSourceSlugs(project);
+      catalog.setDocumentSources(project, [...new Set([...cited, slug])]);
+    } catch {
+      // The commands that follow report their own refusals; this only records the coordinates.
+    } finally {
+      catalog?.close();
     }
   }
 
@@ -263,14 +318,19 @@ function html(script: string): string {
 
   <p class="foot"><strong>Start</strong> adds the repository as a source of the project being worked on, then
     reads its own <code>docs/help/registry.json</code> over the API — no clone, nothing written to the
-    repository. A private repository needs a token (<em>Set a GitHub Token</em>); a public one does not. The
-    organisation is the <code>temcoKnowledge.organisation</code> setting.</p>
+    repository. <strong>Fetch the local copy</strong> clones it into the working area instead (one branch, full
+    history), which is what lets the AI read its files and its history; <strong>Pull</strong> freshens that copy,
+    and <strong>Remove</strong> deletes only the copy. The repository itself is never written to and never
+    pushed to. A private repository needs a token (<em>Set a GitHub Token</em>). The organisation is the
+    <code>temcoKnowledge.organisation</code> setting; the working area is
+    <code>temcoKnowledge.workspaceFolder</code>.</p>
 
 <script nonce="${script}">
 const vscode = acquireVsCodeApi();
 const $ = (id) => document.getElementById(id);
 let repositories = [];
 let cited = [];
+let copies = {};
 
 $('reload').addEventListener('click', () => vscode.postMessage({ type: 'reload' }));
 $('filter').addEventListener('input', () => draw());
@@ -296,6 +356,7 @@ window.addEventListener('message', (event) => {
 
   repositories = message.repositories || [];
   cited = message.cited || [];
+  copies = message.copies || {};
   $('error').replaceChildren();
   $('bar').hidden = false;
   $('lede').textContent =
@@ -355,11 +416,28 @@ function draw() {
     copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: repo.cloneUrl }));
     do_.append(start, open, copy);
 
+    // The local copy: fetch it, or pull it when it is already here. Never automatic — this is the button.
+    const cloned = Object.prototype.hasOwnProperty.call(copies, repo.name);
+    const local = document.createElement('button');
+    local.textContent = cloned ? 'Pull' : 'Fetch the local copy';
+    local.addEventListener('click', () => vscode.postMessage({ type: cloned ? 'pull' : 'fetch', name: repo.name }));
+    do_.append(local);
+    if (cloned) {
+      const show = document.createElement('button');
+      show.textContent = 'Open the local copy';
+      show.addEventListener('click', () => vscode.postMessage({ type: 'openClone', name: repo.name }));
+      const drop = document.createElement('button');
+      drop.textContent = 'Remove the local copy';
+      drop.addEventListener('click', () => vscode.postMessage({ type: 'removeClone', name: repo.name }));
+      do_.append(show, drop);
+    }
+
     card.append(top, desc, do_);
     if (cited.includes(repo.name)) {
       const mark = document.createElement('p');
       mark.className = 'note cited-mark';
-      mark.textContent = 'Already a source of the project being worked on.';
+      mark.textContent = 'Already a source of the project being worked on.  '
+        + 'Read from the API' + (Object.prototype.hasOwnProperty.call(copies, repo.name) ? '' : ' — fetching a local copy lets the AI read its files.');
       card.append(mark);
     }
     return card;
