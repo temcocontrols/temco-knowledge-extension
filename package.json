@@ -76,6 +76,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "temcoKnowledge.expandAll",
+        "title": "Expand All",
+        "icon": "$(expand-all)"
+      },
+      {
         "command": "temcoKnowledge.home",
         "title": "Home",
         "icon": "$(home)"
@@ -465,6 +470,11 @@
           "command": "temcoKnowledge.refresh",
           "when": "view == temcoKnowledge.pages",
           "group": "navigation@2"
+        },
+        {
+          "command": "temcoKnowledge.expandAll",
+          "when": "view == temcoKnowledge.pages",
+          "group": "navigation@3"
         },
         {
           "command": "temcoKnowledge.newProject",

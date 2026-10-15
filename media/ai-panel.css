@@ -1,75 +1,175 @@
-/* The Temco Knowledge panel. No framework, no bundler: messages in, messages out. */
+/* The Temco Knowledge panel. No framework, no bundler: messages in, messages out.
+   The shape is VS Code's own chat: what was said, then one composer at the bottom with the actions inside it. */
+
 :root {
-  --gap: 8px;
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
+  margin: 0;
+  /*
+   * VS Code injects a default stylesheet into every webview (`@layer vscode-default`) whose body carries
+   * `padding: 0 20px`. That is why this panel looked inset compared with VS Code's own chat: the padding has to
+   * be stated here, and an unlayered rule beats a layered one whatever order they arrive in.
+   */
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--gap);
-  margin: 0;
-  padding: var(--gap);
   height: 100vh;
-  box-sizing: border-box;
+  overflow: hidden;
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
 }
 
-header {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--gap);
-  border-bottom: 1px solid var(--vscode-panel-border);
-  padding-bottom: 6px;
-}
-
-#where {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
-}
-
-.muted {
-  color: var(--vscode-descriptionForeground);
-  white-space: nowrap;
-}
+/* What was said ---------------------------------------------------------------- */
 
 #transcript {
   flex: 1 1 auto;
   overflow-y: auto;
+  padding: 10px 12px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty {
+  margin: auto 0;
+  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+.empty .lede {
+  margin: 0;
+  color: var(--vscode-foreground);
+}
+
+/* What the AI can be asked for. Only ever on screen before the first turn. */
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.guide section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.guide h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+}
+
+.guide p {
+  margin: 0;
+}
+
+.guide svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* An example: clicking fills the box, it does not send — so it is a link, not a button. */
+.ask {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.9em;
+  text-align: left;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+}
+
+.ask::before {
+  content: "\203A  ";
+  color: var(--vscode-descriptionForeground);
+}
+
+.ask:hover {
+  text-decoration: underline;
+}
+
+#modelNote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+#modelNote .choose {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--vscode-textLink-foreground);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.turn {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.turn {
-  border-left: 2px solid var(--vscode-panel-border);
-  padding: 2px 0 2px 8px;
+.turn .body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
-.turn.user {
-  border-left-color: var(--vscode-focusBorder);
+.turn.user .body {
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
 }
 
-.turn.assistant {
-  border-left-color: var(--vscode-charts-blue, var(--vscode-focusBorder));
+.turn.assistant .body {
+  padding: 0 2px;
 }
 
-.turn.note,
-.turn.error {
-  border-left-style: dotted;
+.turn.note .body,
+.turn.error .body {
+  padding: 0 2px;
+  font-size: 0.95em;
   color: var(--vscode-descriptionForeground);
 }
 
-.turn.error {
+.turn.error .body {
   color: var(--vscode-errorForeground);
-}
-
-.body {
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .body:empty::after {
@@ -77,58 +177,7 @@ header {
   color: var(--vscode-descriptionForeground);
 }
 
-#form {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-textarea {
-  resize: vertical;
-  font-family: inherit;
-  font-size: inherit;
-  color: var(--vscode-input-foreground);
-  background: var(--vscode-input-background);
-  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
-  padding: 4px 6px;
-}
-
-#buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-button {
-  font-family: inherit;
-  font-size: inherit;
-  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
-  background: var(--vscode-button-secondaryBackground, transparent);
-  border: 1px solid var(--vscode-panel-border);
-  padding: 3px 10px;
-  cursor: pointer;
-}
-
-button.primary {
-  color: var(--vscode-button-foreground);
-  background: var(--vscode-button-background);
-  border-color: var(--vscode-button-background);
-}
-
-button.quiet {
-  border-color: transparent;
-  background: transparent;
-}
-
-button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.hidden {
-  display: none;
-}
-
+/* The pages an answer used */
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -136,15 +185,247 @@ button:disabled {
 }
 
 .chip {
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  border: 1px solid var(--vscode-panel-border);
-  color: var(--vscode-descriptionForeground);
+  font: inherit;
+  font-size: 0.9em;
+  padding: 1px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground);
   background: transparent;
+  border: 1px dashed var(--vscode-widget-border, var(--vscode-panel-border));
 }
 
 .chip.stale {
-  border-style: dashed;
-  color: var(--vscode-editorWarning-foreground, var(--vscode-descriptionForeground));
+  color: var(--vscode-descriptionForeground);
+}
+
+/* What it is about ------------------------------------------------------------- */
+
+#tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+#tip svg {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+
+#where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The composer ----------------------------------------------------------------- */
+
+#form {
+  padding: 8px 12px 0;
+}
+
+/* The composer: a filled input box like VS Code's own chat — white in a light theme, because that is what
+   `--vscode-input-background` is there. Focusing it, or typing in it, brings the focus border. */
+.box {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, transparent));
+  transition: border-color 0.1s ease;
+}
+
+.box:focus-within,
+.box.filled {
+  border-color: var(--vscode-focusBorder);
+}
+
+textarea {
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--vscode-input-foreground);
+  font: inherit;
+  line-height: 1.5;
+  /* A chat input, not a search box: room for three lines before anything is typed, and it grows from there. */
+  min-height: 64px;
+  max-height: 220px;
+  padding: 10px 12px 0;
+  overflow-y: auto;
+}
+
+textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px 8px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 0.9em;
+  padding: 3px 9px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--vscode-descriptionForeground);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+/* The chips are secondary on a filled box, so their hover tint has to come from the panel, not the input. */
+.action:hover:not(:disabled) {
+  color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.18));
+}
+
+.action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.send {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.send:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+}
+
+.send:disabled {
+  background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
+  color: var(--vscode-descriptionForeground);
+  cursor: default;
+}
+
+.send.stop {
+  background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+}
+
+/* What it runs on -------------------------------------------------------------- */
+
+#status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px 14px 10px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.88em;
+}
+
+#status .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+#status .dot.live {
+  background: var(--vscode-charts-green, #3fb950);
+  opacity: 1;
+}
+
+#status .sep {
+  opacity: 0.5;
+}
+
+/* The model is the one control in the status row: it opens the list, as it does in VS Code's own chat. */
+#status .model {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  font: inherit;
+  padding: 1px 8px 1px 5px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+#status .model:hover:not(:disabled) {
+  color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.18));
+}
+
+#status .model:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+#status .model span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Icons: inline, so the panel adds no dependency for them ---------------------- */
+
+#tip svg,
+.action svg,
+#status .model svg,
+.send svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.send svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.6;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* A narrow side bar keeps the icons and drops the words: the titles still say what each one does. */
+@media (max-width: 360px) {
+  .action .label {
+    display: none;
+  }
+
+  .action {
+    padding: 3px 6px;
+  }
 }

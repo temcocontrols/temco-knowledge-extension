@@ -484,22 +484,81 @@ export class AiPanel implements vscode.WebviewViewProvider {
 <title>Temco Knowledge</title>
 </head>
 <body>
-<header>
+<div id="transcript">
+  <div id="empty" class="empty">
+    <p class="lede">The AI works from the page you have open. It runs on this machine, and nothing it writes is
+    applied until you accept the diff.</p>
+
+    <div class="guide">
+      <section>
+        <h4><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.4 2.1l2.5 2.5M3 13l.9-3.6 7.1-7.1 2.5 2.5-7.1 7.1z"/></svg>Draft a page</h4>
+        <p>Ask for an update and it comes back as a diff. The commit range it read is named on the diff, and one
+        undo takes it back.</p>
+        <button type="button" class="ask" data-text="Draft update — say what changed since the last review">Draft update — say what changed since the last review</button>
+        <button type="button" class="ask" data-text="Draft update — the manifest format is missing from this page">Draft update — the manifest format is missing from this page</button>
+      </section>
+
+      <section>
+        <h4><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>Ask about a page</h4>
+        <p>An answer about the page in front. It cites the pages it used, so you can check it yourself.</p>
+        <button type="button" class="ask" data-text="What does this page leave out?">What does this page leave out?</button>
+        <button type="button" class="ask" data-text="Where does the controller read the firmware version?">Where does the controller read the firmware version?</button>
+      </section>
+
+      <section>
+        <h4><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2l5.2 2.6L8 7.4 2.8 4.8z"/><path d="M2.8 7.6L8 10.2l5.2-2.6"/><path d="M2.8 10.4L8 13l5.2-2.6"/></svg>Ask across an area</h4>
+        <p>The pages around this one — its area and its tags. When it finds only search results, it says so instead
+        of guessing.</p>
+        <button type="button" class="ask" data-text="Which pages describe the version check?">Which pages describe the version check?</button>
+        <button type="button" class="ask" data-text="Is the manifest format documented anywhere in this area?">Is the manifest format documented anywhere in this area?</button>
+      </section>
+
+      <section>
+        <h4><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.2L12.5 4.8v9.7h-8.5z"/><path d="M9.2 1.5v3.3h3.3"/></svg>A document for a product</h4>
+        <p>Read a project's sources from the Library — a repository at a branch you choose — and every page they
+        hold appears in the Workspace. Open one, and the AI works on it.</p>
+      </section>
+    </div>
+
+    <p id="modelNote" class="hidden">No model is installed yet.
+      <button type="button" id="chooseModel" class="choose">Choose a model&hellip;</button></p>
+  </div>
+</div>
+<div id="tip">
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1.5h5.2L12.5 4.8v9.7h-8.5z"/><path d="M9.2 1.5v3.3h3.3"/></svg>
   <span id="where">no page open</span>
-  <span id="model" class="muted">no model</span>
-</header>
-<div id="transcript"></div>
-<div id="foot" class="muted">local &middot; offline &middot; a draft is a diff</div>
+</div>
 <form id="form">
-  <textarea id="text" rows="2" placeholder="Ask about the open page&hellip;"></textarea>
-  <div id="buttons">
-    <button id="send" type="submit" class="primary">Ask</button>
-    <button id="draft" type="button">Draft update</button>
-    <button id="area" type="button">Ask the area</button>
-    <button id="apply" type="button" class="hidden">Apply draft</button>
-    <button id="models" type="button" class="quiet">Models&hellip;</button>
+  <div class="box" id="box">
+    <textarea id="text" rows="1" placeholder="Ask about the open page&hellip;"></textarea>
+    <div class="row">
+      <div class="left">
+        <button id="draft" type="button" class="action" title="Draft an update to this page — it opens as a diff you accept">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.4 2.1l2.5 2.5M3 13l.9-3.6 7.1-7.1 2.5 2.5-7.1 7.1z"/></svg><span class="label">Draft update</span>
+        </button>
+        <button id="area" type="button" class="action" title="Ask about the pages around this one">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.2l5.2 2.6L8 7.4 2.8 4.8z"/><path d="M2.8 7.6L8 10.2l5.2-2.6"/><path d="M2.8 10.4L8 13l5.2-2.6"/></svg><span class="label">Ask the area</span>
+        </button>
+        <button id="apply" type="button" class="action hidden" title="Replace the page with the draft — one undo takes it back">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.4l3.2 3.2L13 4.8"/></svg><span class="label">Apply draft</span>
+        </button>
+      </div>
+      <button id="send" type="submit" class="send" title="Ask about this page (Enter)">
+        <svg class="icon-send" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3.4"/><path d="M3.8 7.6L8 3.4l4.2 4.2"/></svg>
+        <svg class="icon-stop hidden" viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="6" height="6" rx="1.2"/></svg>
+      </button>
+    </div>
   </div>
 </form>
+<div id="status">
+  <span class="dot" id="dot"></span>
+  <span>Local</span>
+  <span class="sep">&middot;</span>
+  <button id="models" type="button" class="model" title="Which local model answers, and what is installed">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="3.5" width="9" height="9" rx="2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/></svg>
+    <span id="model">nothing installed</span>
+  </button>
+</div>
 <script src="${script}"></script>
 </body>
 </html>`;

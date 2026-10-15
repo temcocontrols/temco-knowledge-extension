@@ -4,8 +4,10 @@
   const byId = (id) => document.getElementById(id);
 
   const transcript = byId('transcript');
+  const empty = byId('empty');
   const where = byId('where');
   const model = byId('model');
+  const dot = byId('dot');
   const input = byId('text');
   const form = byId('form');
   const send = byId('send');
@@ -13,9 +15,22 @@
   const area = byId('area');
   const apply = byId('apply');
   const models = byId('models');
+  const box = byId('box');
+  const note = byId('modelNote');
+  const chooseModel = byId('chooseModel');
 
   let busy = false;
   let streaming = null;
+  let said = false;
+
+  /** The send button is the one control that reflects the box: nothing to ask, nothing to send. */
+  function sync() {
+    const filled = input.value.trim().length > 0;
+    send.disabled = !busy && !filled;
+    box.classList.toggle('filled', filled);
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 220) + 'px';
+  }
 
   function atBottom() {
     return transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 40;
@@ -28,6 +43,10 @@
   }
 
   function turn(kind, text) {
+    if (!said && empty) {
+      empty.remove();
+      said = true;
+    }
     const element = document.createElement('div');
     element.className = 'turn ' + kind;
     const body = document.createElement('div');
@@ -41,12 +60,15 @@
 
   function setBusy(value) {
     busy = value;
-    send.textContent = value ? 'Stop' : 'Ask';
-    send.className = value ? 'quiet' : 'primary';
+    send.classList.toggle('stop', value);
+    send.title = value ? 'Stop' : 'Ask about this page (Enter)';
+    send.querySelector('.icon-send').classList.toggle('hidden', value);
+    send.querySelector('.icon-stop').classList.toggle('hidden', !value);
     draft.disabled = value;
     area.disabled = value;
     models.disabled = value;
     input.disabled = false;
+    sync();
   }
 
   function chips(items) {
@@ -76,6 +98,9 @@
       : next.runtimeReady
         ? 'no model chosen'
         : 'nothing installed';
+    dot.classList.toggle('live', Boolean(next.model));
+    // The one thing worth saying before anything else: without a model, none of the rest of this can happen.
+    note.classList.toggle('hidden', Boolean(next.model));
     apply.classList.toggle('hidden', !next.canApply);
     if (typeof next.busy === 'boolean') {
       setBusy(next.busy);
@@ -94,6 +119,7 @@
     }
     vscode.postMessage({ type: 'ask', text: text });
     input.value = '';
+    sync();
   });
 
   draft.addEventListener('click', () => {
@@ -106,6 +132,16 @@
 
   apply.addEventListener('click', () => vscode.postMessage({ type: 'apply' }));
   models.addEventListener('click', () => vscode.postMessage({ type: 'models' }));
+  chooseModel.addEventListener('click', () => vscode.postMessage({ type: 'models' }));
+
+  // An example prompt puts its words in the box rather than sending them: they are a start, not a question.
+  for (const example of document.querySelectorAll('#empty .ask')) {
+    example.addEventListener('click', () => {
+      input.value = example.dataset.text || '';
+      sync();
+      input.focus();
+    });
+  }
 
   input.addEventListener('keydown', (event) => {
     // Enter sends; Shift+Enter starts a new line, as in every chat box.
@@ -114,6 +150,9 @@
       form.requestSubmit();
     }
   });
+
+  input.addEventListener('input', sync);
+  sync();
 
   window.addEventListener('message', (event) => {
     const message = event.data || {};

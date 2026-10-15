@@ -239,6 +239,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('temcoKnowledge.showStatus', report),
     vscode.commands.registerCommand('temcoKnowledge.validate', report),
     vscode.commands.registerCommand('temcoKnowledge.refresh', refresh),
+    // The half VS Code does not provide: its tree gives a view *Collapse All* and nothing that opens it again.
+    vscode.commands.registerCommand('temcoKnowledge.expandAll', () => provider.expandAll()),
 
     vscode.commands.registerCommand('temcoKnowledge.openRegistry', async (node?: KnowledgeNode) => {
       const uri = rootOf(node, roots)?.registryUri;

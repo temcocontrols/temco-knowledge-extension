@@ -114,6 +114,32 @@
   the whole refresh, the tree data, the status bar, the start tab — never ran, while the views that were
   registered earlier kept working. The symptom was a Workspace view that stayed empty for two sessions. `npm run
   compile` now also runs `scripts/check-commands.mjs`, which fails the build if a command id is registered twice.
+- **Expand All, to go with Collapse All.** VS Code's tree gives a view one control — *Collapse All* — and
+  nothing that opens it again, so `temcoKnowledge.expandAll` is a button beside it in the Workspace title bar:
+  it re-reads the tree with every parent reported expanded. That is one render's worth on purpose — the next
+  read puts the view back into its normal shape (the only root's areas open, chapters closed) instead of
+  re-expanding a tree nobody asked about twice.
+- **The AI panel now has the shape VS Code's own chat has.** One composer at the bottom instead of a row of
+  buttons: a rounded box holding the input, the actions as chips inside it (*Draft update* · *Ask the area* ·
+  *Apply draft*), and a round send button. Above it, the page the answer will be about; below it, the runtime
+  (*Local · model*), where the model is itself the control that opens the model list. The input is a chat box —
+  three lines tall before anything is typed, growing with what is in it — and the composer is **a filled input
+  box, white in a light theme**, taking the focus border when it is focused or holds something. The send button
+  is disabled while there is nothing to ask and becomes *Stop* while an answer streams, and the labels fall
+  back to their icons when the side bar is narrow. Every icon is inline SVG, so the panel still ships with no
+  dependency. The behaviour behind it is unchanged.
+- **The panel's own width.** It was drawn inset by 20 px on each side compared with VS Code's chat, and the
+  reason was in VS Code, not in this panel: every webview's body is given `padding: 0 20px` by an injected
+  default stylesheet (`@layer vscode-default`, in `webview/browser/pre/index.html`). The panel now states its
+  own `body { padding: 0 }` — an unlayered rule beats the injected layer — and its sections carry the 12–14 px
+  their layout wants, so the composer runs nearly edge to edge (`media/ai-panel.css` says where that comes from).
+- **The panel says what the AI can be asked for.** The empty state is no longer one sentence: it opens with what
+  the AI works from and that nothing is applied without acceptance, then four short blocks — *Draft a page* ·
+  *Ask about a page* · *Ask across an area* · *A document for a product* — each with what it does and, for the
+  first three, two example prompts. **Clicking an example puts its words in the input box without sending them**,
+  so it is a starting point rather than a question someone else chose. With no model installed the block ends
+  with *No model is installed yet — Choose a model…*, because without one none of the rest can happen. It all
+  disappears at the first turn, as before.
 
 ## 0.0.1
 
