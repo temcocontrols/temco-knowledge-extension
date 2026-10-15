@@ -8,7 +8,10 @@
 // This is the page that is *not* about one project. The hub (`src/projectHub.ts`) is the opposite: one project,
 // in depth. Both are tabs in the same group, so going from the list to one project and back is two clicks.
 
+import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
+import { OFFERED_SCRIPTS } from './builds';
 import { Catalog, CatalogUnavailable } from './catalog/store';
 import { slugOf } from './projectPage';
 import { Selection } from './selected';
@@ -26,17 +29,40 @@ export interface ProjectCard {
   artifacts: number;
   builtAt?: string;
   selected: boolean;
+  /** The repository's own scripts this project's folders have — empty when none is a folder on this machine. */
+  scripts: string[];
 }
 
 interface ProjectsMessage {
   type: 'ready' | 'action';
-  action?: 'new' | 'open' | 'edit' | 'work' | 'clear' | 'read' | 'build' | 'remove';
+  action?: 'new' | 'open' | 'edit' | 'work' | 'clear' | 'read' | 'build' | 'remove' | 'scripts';
   slug?: string;
   path?: string;
 }
 
+/**
+ * The offered scripts a folder has, read from its own `package.json`.
+ *
+ * A read, and only a read: what runs is the Library's own `runScript`, which reports a run as where, when and
+ * what it exited with. The allowlist is shared for the same reason it exists — invoking an arbitrary npm script
+ * from a page is exactly what it is there to prevent.
+ */
+function offeredIn(directory: string): string[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8')) as {
+      scripts?: Record<string, string>;
+    };
+    const names = parsed.scripts ?? {};
+    return OFFERED_SCRIPTS.filter((script) => names[script.id] !== undefined).map((script) => script.id);
+  } catch {
+    return [];
+  }
+}
+
 export class ProjectsPage {
   private panel: vscode.WebviewPanel | undefined;
+  /** What the last render put on screen: the page answers a click without asking the catalog again. */
+  private cards: ProjectCard[] = [];
 
   constructor(
     private readonly context: vscode.ExtensionContext,
@@ -67,6 +93,36 @@ export class ProjectsPage {
     if (this.panel) {
       void this.seed();
     }
+  }
+
+  /**
+   * Runs one of the repository's own scripts for a project.
+   *
+   * Which scripts is decided by the folders this project cites, not by a list in the page: a repository that has
+   * no such script is not offered it. A script runs in the folder *being read*, and the folder being read follows
+   * the project being worked on — so when the project is not that one, it is made so first, out loud, because
+   * the Workspace view changes with it.
+   */
+  private async runOne(slug?: string): Promise<void> {
+    const card = this.cards.find((candidate) => candidate.slug === slug);
+    const offered = OFFERED_SCRIPTS.filter((script) => card?.scripts.includes(script.id) === true);
+    if (!card || offered.length === 0) {
+      void vscode.window.showInformationMessage(
+        'Temco Knowledge: none of this project’s sources is a folder on this machine, so its own scripts cannot be run from here.'
+      );
+      return;
+    }
+    const picked = await vscode.window.showQuickPick(
+      offered.map((script) => ({ label: script.label, detail: script.detail, description: script.id, id: script.id })),
+      { title: `Run one of the repository’s own scripts — ${card.name}`, placeHolder: 'Each one writes to your repository, in its own format' }
+    );
+    if (!picked) {
+      return;
+    }
+    if (this.selection.project() !== card.slug) {
+      await vscode.commands.executeCommand('temcoKnowledge.selectProject', card.slug);
+    }
+    await vscode.commands.executeCommand('temcoKnowledge.runScript', picked.id);
   }
 
   private async receive(message: ProjectsMessage): Promise<void> {
@@ -100,6 +156,9 @@ export class ProjectsPage {
         break;
       case 'build':
         await vscode.commands.executeCommand('temcoKnowledge.buildProject', slug);
+        break;
+      case 'scripts':
+        await this.runOne(slug);
         break;
       case 'remove':
         await vscode.commands.executeCommand('temcoKnowledge.removeProject', slug);
@@ -150,11 +209,28 @@ export class ProjectsPage {
               read: known?.lastReadMode,
             };
           }),
+          scripts: [],
         });
+
+        // The repository's own scripts, for the projects whose source is a folder on this machine. A script
+        // belongs to a repository, so this is offered per project only because a project is what cites one.
+        const card = cards[cards.length - 1];
+        for (const source of cited) {
+          const known = sources.find((one) => one.name === source.name);
+          const detail = known ? catalog.source(known.slug) : undefined;
+          if (detail?.path !== undefined) {
+            for (const id of offeredIn(detail.path)) {
+              if (!card.scripts.includes(id)) {
+                card.scripts.push(id);
+              }
+            }
+          }
+        }
       }
 
       // The one being worked on first: this page is read top-down, and the top is what you are on.
       cards.sort((a, b) => Number(b.selected) - Number(a.selected) || a.name.localeCompare(b.name));
+      this.cards = cards;
 
       await this.panel.webview.postMessage({
         type: 'projects',
@@ -331,7 +407,7 @@ function card(data) {
   do_.className = 'do';
   if (data.selected) {
     do_.append(
-      action(data, 'Stop working on it', 'clear', 'The Workspace view goes back to the open folders'),
+      action(data, 'Stop working on it', 'clear', 'The Workspace view is hidden again — the Library is all there is'),
       action(data, 'Open the project', 'open', 'Its own page, with tabs')
     );
   } else {
@@ -341,8 +417,15 @@ function card(data) {
     );
   }
   do_.append(
-    action(data, 'Read sources', 'read', 'Reads this project\\'s sources that have never been read'),
-    action(data, 'Build', 'build', 'Runs the repository\\'s own generator, then the output script'),
+    action(data, 'Read sources', 'read', 'Reads this project’s sources that have never been read'),
+    action(data, 'Build', 'build', 'Runs the repository’s own generator, then the output script')
+  );
+  if (data.scripts.length > 0) {
+    do_.append(
+      action(data, 'Scripts…', 'scripts', 'The repository’s own checks and generators: pick one to run')
+    );
+  }
+  do_.append(
     action(data, 'Edit', 'edit', 'Name, version, owner, sources, outputs'),
     action(data, 'Remove…', 'remove', 'Forgets the project; its sources are kept')
   );

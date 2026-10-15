@@ -185,8 +185,15 @@ export class HomePanel {
     // sources, not the window's folders — the same one world the Workspace view shows.
     const project = this.selection.project();
     const projectName = project === undefined ? undefined : documents.find((row) => slugOf(row.name) === project)?.name;
+    // With no project being worked on nothing is read at all, so the page says so rather than counting folders
+    // it is not reading.
     const reading =
-      projectName ?? (roots.length === 1 ? roots[0].folder.name : `${roots.length} open folders`);
+      projectName ??
+      (roots.length === 0
+        ? 'nothing — no project is being worked on'
+        : roots.length === 1
+          ? roots[0].folder.name
+          : `${roots.length} sources`);
 
     const body = `
       <header class="top">
@@ -228,7 +235,7 @@ export class HomePanel {
               ? `<p class="quiet">${escapeHtml(
                   projectName !== undefined
                     ? `${projectName} has no source that can be read yet — add one from the Library or the project's own page, then read it.`
-                    : 'Nothing is being read: no project is being worked on and no open folder holds a docs/help/registry.json.'
+                    : 'Nothing is being read: no project is being worked on. Pick one in the Library — the Workspace view follows the project, never the folders this window happens to have open.'
                 )}</p>`
               : table(['Source', 'Pages', 'Errors', 'Warnings', 'Never reviewed', 'Stale'], openRows)
           }

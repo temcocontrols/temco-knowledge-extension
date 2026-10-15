@@ -7,18 +7,17 @@ code. It is delivered two ways from this one codebase:
 - installed into an ordinary VS Code for engineers who already have one.
 
 **This repository holds no content.** There is no page, no image and no registry here — the extension
-operates on the folder you open, which is a product repository.
+operates on the **project being worked on**, whose sources are product repositories, read wherever they live.
 
 ## What it does
 
 Four surfaces from one extension — the same in our own application and in an ordinary VS Code:
 
-- **Content** (activity bar) — every open repository's registry as areas → chapters → pages, with the metadata a
-  maintainer needs (owner, audience, whether the page ships, whether it was ever reviewed) and, from the
-  repository's own generated files, each page's last change, its headings, and whether the code it claims moved
-  on since the last review. A **Gaps** node gathers every structural fault, problems land in the file that has
-  to be fixed, and the status bar carries the totals. When a folder has no registry at all, the view's empty
-  state offers to start one.
+- **Workspace** (activity bar, above the Library) — the pages of the project being worked on, as
+  areas → chapters → pages, with the metadata a maintainer needs (owner, audience, whether the page ships,
+  whether it was ever reviewed) and, from the source's own generated files, each page's last change, its
+  headings, and whether the code it claims moved on since the last review. A **Gaps** node gathers every
+  structural fault, problems land in the file that has to be fixed, and the status bar carries the totals.
 - **Temco Knowledge** (right side) — the local AI: ask about the open page, *Draft update* (a diff you apply
   as one undoable edit), and *Ask the area* (an answer citing real pages, or search results when it cites
   none). The runtime and the models are downloaded on request, verified against their checksums, and run

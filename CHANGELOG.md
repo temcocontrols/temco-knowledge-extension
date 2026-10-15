@@ -87,6 +87,33 @@
   contributed panel container (`temcoKnowledgePanel`) — docked on the right by the workbench, since VS Code has
   no contribution point that places a container there — where
   `app-layout.md` draws it.
+- **What opens when the platform starts.** The tab that used to open by itself was the home page, always; it is
+  now **the dashboard of the project being worked on** — the surface that says what is in it and what next —
+  then **the page you were last on**, then the home page when there is no project and no page to return to.
+  `temcoKnowledge.start.open` (`project` · `page` · `home` · `none`) chooses, replacing
+  `temcoKnowledge.home.openOnStart`; `none` still opens no tab at all, and every other choice falls through
+  rather than showing an empty editor.
+- **Nothing has to be clicked to see the workspace.** With exactly one project recorded it selects itself on
+  activation — there is nothing to choose between — so the Workspace view loads that project's pages without
+  being asked. With two or more, nothing is guessed. The views also open what they are showing: the only
+  repository's areas arrive expanded with their chapters beneath them, and the Library's **Projects** row opens
+  itself, so the names of what you have are on screen. A person's own expand or collapse beats both defaults for
+  the rest of the session, because a tree that re-opens itself after every refresh is worse than one that never
+  opened.
+- **The Workspace view is about the project, never about the folders you happen to have open.** It shows the
+  selected project's sources — a local folder gets the full checks even when the window has it closed, a source
+  that is not here shows what the read recorded — and the tree, the status bar, the registry checks and the
+  Problems list all follow that project. With nothing to show it is never blank and never hidden: it carries a
+  **row that says why and offers the act that fills it** (*no project yet* → create one; *no project is being
+  worked on* → choose one in the Library; *this project has nothing to show* → open it and read its sources).
+  `viewsWelcome` was tried for those states and dropped: a welcome's `when` clause is resolved when the view is
+  first painted, before the refresh has read anything, so it announced *nothing recorded yet* over a catalog
+  holding five projects.
+- **Activation could fail silently, and it did.** `temcoKnowledge.runOwed` was registered both in `builds.ts`
+  and in `extension.ts`; the second registration threw in the middle of `activate()`, so everything after it —
+  the whole refresh, the tree data, the status bar, the start tab — never ran, while the views that were
+  registered earlier kept working. The symptom was a Workspace view that stayed empty for two sessions. `npm run
+  compile` now also runs `scripts/check-commands.mjs`, which fails the build if a command id is registered twice.
 
 ## 0.0.1
 

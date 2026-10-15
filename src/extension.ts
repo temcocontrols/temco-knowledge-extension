@@ -1,14 +1,16 @@
 // Temco Knowledge — activation.
 //
-// The extension is a reader of the folder you open: it finds each workspace folder's registry, shows it in
-// the Content view, and reports structural problems where they can be fixed. Nothing is written to a page
-// without an explicit command, and nothing is published from here at all.
+// The extension is a reader, of the **project being worked on**: it finds each of that project's sources, shows
+// their pages in the Workspace view, and reports structural problems where they can be fixed. The project is the
+// front door — the Library lists what there is, choosing one loads the Workspace, and with none chosen nothing is
+// read, so the view can never answer about a folder nobody named. Nothing is written to a page without an
+// explicit command, and nothing is published from here at all.
 
 import * as vscode from 'vscode';
 import { registerAiCommands } from './ai/commands';
 import { AiPanel, AI_VIEW_ID } from './ai/panel';
 import { disposeAi } from './ai/runtime';
-import { registerBuildCommands, registerScriptCommands, runOwed } from './builds';
+import { registerBuildCommands, registerScriptCommands } from './builds';
 import { Catalog } from './catalog/store';
 import { registerCatalogCommands } from './catalog/commands';
 import { publishDiagnostics } from './diagnostics';
@@ -16,19 +18,24 @@ import { registerFeedbackCommands } from './feedback';
 import { registerFormatCommands } from './format';
 import { HomePanel } from './home';
 import { NeedsPage } from './needsPage';
+import { PageOperations, registerPageCommands } from './pageOps';
 import { registerProjectCommands } from './project';
 import { registerProjectBuildCommands } from './projectBuild';
+import { slugOf } from './projectPage';
 import { registerReadCommands } from './read';
 import { registerReportCommands } from './report';
 import { registerScaffoldCommands } from './scaffold';
 import { Selection } from './selected';
 import { fileColumn } from './surface';
 import { DocsRoot, DeclaredPage, RegistryError, collectPages, countStale, folderForPath, loadDocsRoot, registryUriFor, rootFromDeclared, totals } from './registry';
-import { KnowledgeNode, KnowledgeTreeProvider, pageFromNode } from './tree';
-import { registerSectionViews } from './views';
+import { KnowledgeNode, KnowledgeTreeProvider, TreeNote, pageFromNode } from './tree';
+import { LIBRARY_VIEW_ID, registerSectionViews } from './views';
 
 const OUTPUT_NAME = 'Temco Knowledge';
 const VIEW_ID = 'temcoKnowledge.pages';
+/** The Library's own view id, so the focus commands below are spelled from one place. */
+const LIBRARY_FOCUS = `${LIBRARY_VIEW_ID}.focus`;
+const WORKSPACE_FOCUS = `${VIEW_ID}.focus`;
 
 interface BrokenRegistry {
   uri: vscode.Uri;
@@ -41,9 +48,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const provider = new KnowledgeTreeProvider();
   const selection = new Selection(context);
 
+  // Filled in once `refresh` exists: a page operation writes, and a write is not visible until the views have
+  // been re-read. Passing a holder rather than the function keeps the tree's construction independent of it.
+  let redraw = (): void => {};
+  const pageOps = new PageOperations({ roots: () => roots, output, redraw: () => redraw() });
+
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
     showCollapseAll: true,
+    // A chapter is somewhere a page can be put, and the drop is a registry write — see `src/pageOps.ts`.
+    dragAndDropController: pageOps,
   });
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -51,6 +65,13 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(output, diagnostics, treeView, status);
 
   let roots: DocsRoot[] = [];
+  /**
+   * Whether the single project has been allowed to select itself yet — once per window, at the first read.
+   *
+   * It must not be allowed again: with one project, *Stop working on it* would be impossible, because clearing
+   * the selection would re-make it on the very next refresh, and the view would never go away.
+   */
+  let picked = false;
 
   // The AI panel reads the page and the registry through the same model the tree does; it decides nothing.
   const panel = new AiPanel(context, () => roots, selection);
@@ -74,21 +95,26 @@ export function activate(context: vscode.ExtensionContext): void {
     const broken: BrokenRegistry[] = [];
     roots = [];
 
-    // **One world.** With a project selected, the project decides what is read: each of its sources, whether or
-    // not the folder is open in this window, and what a read recorded for the ones that are not here at all.
-    // With no project selected, the open folders are read, exactly as before.
+    // The catalog is read before anything else, for the two facts the rest of this depends on: **which project
+    // is being worked on** — with exactly one recorded there is nothing to choose between, so it chooses itself
+    // — and **whether there is one at all**, which is what the Workspace view's empty state has to say.
+    const projects = await chooseProject(context, selection, !picked);
+    picked = true;
+
+    // **One world.** The project being worked on decides what is read: each of its sources, whether or not the
+    // folder is open in this window, and what a read recorded for the sources that are not here at all. With
+    // nothing selected nothing is read — the Workspace view is about the project, and a tree built from whatever
+    // happens to be open would be a second, unrelated answer to the same question.
     const selected = selection.project();
     const read: { folder: vscode.WorkspaceFolder; source?: ReadableSource }[] = [];
     const recorded: DocsRoot[] = [];
     let projectName: string | undefined;
 
-    if (selected === undefined) {
-      read.push(...(vscode.workspace.workspaceFolders ?? []).map((folder) => ({ folder })));
-    } else {
+    if (selected !== undefined) {
       const project = await projectSources(context, selected);
       if (project.missing) {
         // The project was removed while it was the one being worked on. Clear the selection and let the next
-        // run read the open folders, rather than showing a view about something that is not there.
+        // run read nothing, rather than showing a view about something that is not there.
         await selection.select(undefined);
         return;
       }
@@ -120,9 +146,39 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     roots.push(...recorded);
 
-    provider.setRoots(roots);
-    // The view says which project it is showing, because with a project selected it is no longer about the
-    // window's folders — and a view that silently answers a different question is worse than an empty one.
+    // Why the list is empty, said *in* the list, so the view is never a blank pane and the row carries the one
+    // act that fills it. `viewsWelcome` was tried first and dropped: its `when` clause is resolved at the view's
+    // first paint, which is before the refresh has read anything, so it kept saying "nothing recorded yet" over a
+    // catalog that had five projects in it.
+    const notes: TreeNote[] = [];
+    if (roots.length === 0) {
+      notes.push(
+        selected !== undefined
+          ? {
+              label: `${projectName ?? selected} has nothing to show`,
+              detail: 'its sources have not been read, or they hold no pages',
+              command: { command: 'temcoKnowledge.openProject', args: [selected] },
+            }
+          : (projects ?? 0) > 0
+            ? {
+                label: 'No project is being worked on',
+                detail: 'choose one in the Library',
+                command: { command: 'temcoKnowledge.openProjects' },
+              }
+            : {
+                label: 'No project yet',
+                detail: 'a project is what you manage — create one, then give it a source',
+                command: { command: 'temcoKnowledge.newProject' },
+              }
+      );
+    }
+    for (const { message } of broken) {
+      notes.push({ label: 'A source could not be read', detail: message });
+    }
+
+    provider.setRoots(roots, notes);
+    // The view says which project it is showing: it answers about a project, never about the window, and a view
+    // that silently answers a different question is worse than an empty one.
     treeView.description = projectName
       ? `${projectName} · ${totals(roots).pages} pages`
       : undefined;
@@ -238,6 +294,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
 
+    // The home page lists the folders this editor has open, so it still has to hear about a change to them;
+    // nothing the Workspace view reads depends on them any more.
     vscode.workspace.onDidChangeWorkspaceFolders(() => void refresh())
   );
 
@@ -272,10 +330,12 @@ export function activate(context: vscode.ExtensionContext): void {
   // The Markdown toolbar: it edits the page in front, and reads the registry only to offer a link to a real
   // page — the one write-side surface in this extension that writes nothing.
   registerFormatCommands(context, () => roots);
+  // Operating on a page: creating one, naming it, moving it, retiring it.
+  registerPageCommands(context, { roots: () => roots, output, redraw: () => redraw() });
+  redraw = () => void refresh();
 
   context.subscriptions.push(
     vscode.commands.registerCommand('temcoKnowledge.openNeeds', () => needs.open()),
-    vscode.commands.registerCommand('temcoKnowledge.runOwed', () => runOwed(roots, output)),
     // The one write this extension makes to a page: the empty file for a page the registry already declares.
     vscode.commands.registerCommand(
       'temcoKnowledge.createPage',
@@ -289,16 +349,26 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
-  // The selected project is what everything reads, so a change to it re-reads everything.
-  context.subscriptions.push(selection.onDidChange(() => void refresh()));
+  // Choosing and looking are one sequence, so the sidebar follows the choice: choosing a project brings the
+  // Workspace forward, clearing one brings the Library back. `started` keeps the boot out of it — with one
+  // project it selects itself on activation, and that is not the person choosing anything.
+  let started = false;
+  context.subscriptions.push(
+    selection.onDidChange(async () => {
+      // Read first, then bring a view forward: the tree it brings forward is the tree of what was just picked.
+      await refresh();
+      if (started) {
+        await vscode.commands.executeCommand(selection.project() === undefined ? LIBRARY_FOCUS : WORKSPACE_FOCUS);
+      }
+    })
+  );
 
-  // Opening the extension shows the platform's home page — it is the first thing a person should see. It can
-  // be turned off, because it opens a tab, and a tab is not always wanted.
-  if (vscode.workspace.getConfiguration('temcoKnowledge').get<boolean>('home.openOnStart', true)) {
-    home.open();
-  }
-
-  void refresh();
+  // Then the tab: `openStart`, the project's dashboard or the page you were last on. The sidebar itself is left
+  // where the person put it — two views cannot both be "in front", and moving one under them is not a favour.
+  void refresh().then(() => {
+    started = true;
+    return openStart(selection, home);
+  });
 }
 
 export function deactivate(): void {
@@ -361,6 +431,96 @@ async function projectSources(
   } finally {
     catalog.close();
   }
+}
+
+/**
+ * The catalog's project list, read at the top of every refresh.
+ *
+ * It answers the two questions the rest of the refresh depends on: **whether any project exists at all**, which
+ * is what the Workspace view's empty state has to say, and — allowed once, on the first read of a window —
+ * **which project is being worked on**: with exactly one recorded there is nothing to choose between, so it
+ * selects itself and the Workspace is ready behind the Library. With two or more nothing is guessed, because
+ * guessing would show a workspace about something nobody named.
+ *
+ * `maySelect` is false after that first read, and it has to be: choosing on every refresh would make *Stop
+ * working on it* impossible with a single project, since clearing the selection would re-make it on the next
+ * read and the view would never go away. Returns how many projects there are, or `undefined` when the catalog
+ * could not be opened at all — the empty state has to tell the two apart.
+ */
+async function chooseProject(
+  context: vscode.ExtensionContext,
+  selection: Selection,
+  maySelect: boolean
+): Promise<number | undefined> {
+  let catalog: Catalog | undefined;
+  try {
+    catalog = await Catalog.open(context);
+    const documents = catalog.documents();
+    if (maySelect && selection.project() === undefined && documents.length === 1) {
+      await selection.select(slugOf(documents[0].name));
+    }
+    return documents.length;
+  } catch {
+    // A catalog that cannot be opened is reported where it is used — the Library, a read — and activation must
+    // not depend on it. Selecting nothing leaves the Workspace view saying there is nothing to show.
+    return undefined;
+  } finally {
+    catalog?.close();
+  }
+}
+
+/**
+ * The tab the platform opens when it starts. `temcoKnowledge.start.open` decides, and nothing else.
+ *
+ * The order is the order a person works in: **the project you are on** — its dashboard, which says what is in
+ * it and what next — then **the page you were last on**, because that is the work you left, then **the home
+ * page**. A preference that cannot be honoured falls through instead of showing an empty editor, so `project`
+ * with no project opens the page you left, and `page` whose file is gone opens the project's dashboard. Only
+ * `none` opens no tab at all.
+ */
+async function openStart(selection: Selection, home: HomePanel): Promise<void> {
+  const mode = vscode.workspace.getConfiguration('temcoKnowledge').get<string>('start.open', 'project');
+  if (mode === 'none') {
+    return;
+  }
+
+  const project = selection.project();
+  if (mode === 'project' && project !== undefined) {
+    await vscode.commands.executeCommand('temcoKnowledge.openProject', project);
+    return;
+  }
+  if (mode !== 'home' && (await openRememberedPage(selection))) {
+    return;
+  }
+  if (mode === 'page' && project !== undefined) {
+    await vscode.commands.executeCommand('temcoKnowledge.openProject', project);
+    return;
+  }
+  home.open();
+}
+
+/**
+ * The page the selected project remembers, opened when the file is still there.
+ *
+ * The remembered path can be gone — a branch switched, a page moved — and opening it anyway would report a
+ * fault before saying hello. Answers whether it opened one, so the caller can fall through to the next step.
+ */
+async function openRememberedPage(selection: Selection): Promise<boolean> {
+  const page = selection.page();
+  if (page?.path === undefined) {
+    return false;
+  }
+  try {
+    await vscode.workspace.fs.stat(vscode.Uri.file(page.path));
+  } catch {
+    return false;
+  }
+  await vscode.commands.executeCommand('temcoKnowledge.openFile', {
+    path: page.path,
+    id: page.id,
+    title: page.title,
+  });
+  return true;
 }
 
 /** A new page starts as a title and nothing else — the structure lives in the registry, not in front matter. */

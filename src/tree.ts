@@ -23,7 +23,11 @@ class FolderNode {
 
 class AreaNode {
   readonly kind = 'area';
-  constructor(readonly root: DocsRoot, readonly area: AreaGroup) {}
+  /**
+   * True when this area is the view's own top level — with one repository open its areas are, and they open by
+   * themselves so the pages are one click away instead of three. Anything deeper waits to be asked.
+   */
+  constructor(readonly root: DocsRoot, readonly area: AreaGroup, readonly top = false) {}
 }
 
 class ChapterNode {
@@ -47,13 +51,32 @@ class GapsNode {
   constructor(readonly count: number) {}
 }
 
+/**
+ * A row that exists because there is nothing else to show: why the list is empty, and the one act that fills it.
+ *
+ * These are rows rather than a `viewsWelcome`, which was tried and dropped — a welcome's `when` clause is
+ * resolved when the view is first painted, before the refresh has read anything, so it kept announcing "nothing
+ * recorded yet" over a catalog that held five projects.
+ */
+export interface TreeNote {
+  label: string;
+  detail: string;
+  command?: { command: string; args?: unknown[] };
+}
+
+class NoteNode {
+  readonly kind = 'note';
+  constructor(readonly note: TreeNote) {}
+}
+
 export type KnowledgeNode =
   | FolderNode
   | AreaNode
   | ChapterNode
   | PageNode
   | IssueNode
-  | GapsNode;
+  | GapsNode
+  | NoteNode;
 
 export function pageFromNode(node: KnowledgeNode | undefined): PageNode | undefined {
   return node?.kind === 'page' ? node : undefined;
@@ -64,9 +87,11 @@ export class KnowledgeTreeProvider implements vscode.TreeDataProvider<KnowledgeN
   readonly onDidChangeTreeData = this.changed.event;
 
   private roots: DocsRoot[] = [];
+  private notes: TreeNote[] = [];
 
-  setRoots(roots: DocsRoot[]): void {
+  setRoots(roots: DocsRoot[], notes: TreeNote[] = []): void {
     this.roots = roots;
+    this.notes = notes;
     this.changed.fire();
   }
 
@@ -92,6 +117,20 @@ export class KnowledgeTreeProvider implements vscode.TreeDataProvider<KnowledgeN
         item.tooltip = 'Every page with a structural problem, across all open repositories.';
         return item;
       }
+      case 'note': {
+        const item = new vscode.TreeItem(node.note.label, vscode.TreeItemCollapsibleState.None);
+        item.description = node.note.detail;
+        item.tooltip = `${node.note.label} — ${node.note.detail}`;
+        item.iconPath = new vscode.ThemeIcon(node.note.command ? 'arrow-right' : 'info');
+        if (node.note.command) {
+          item.command = {
+            command: node.note.command.command,
+            title: node.note.label,
+            arguments: node.note.command.args ?? [],
+          };
+        }
+        return item;
+      }
     }
   }
 
@@ -99,14 +138,13 @@ export class KnowledgeTreeProvider implements vscode.TreeDataProvider<KnowledgeN
     if (!node) {
       const roots = this.roots;
       if (roots.length === 0) {
-        // An empty tree on purpose: what this state shows is the view's own welcome content, which offers the
-        // three things a folder without a registry can actually do.
-        return [];
+        // Nothing read is not nothing to say: the rows carry the reason and the way out of it.
+        return this.notes.map((note) => new NoteNode(note));
       }
       const gaps = totals(roots).issues;
       const entry =
         roots.length === 1
-          ? roots[0].areas.map((area) => new AreaNode(roots[0], area))
+          ? roots[0].areas.map((area) => new AreaNode(roots[0], area, true))
           : roots.map((root) => new FolderNode(root));
       return gaps > 0 ? [new GapsNode(gaps), ...entry] : entry;
     }
@@ -161,7 +199,11 @@ function areaItem(node: AreaNode): vscode.TreeItem {
   const { area } = node;
   const item = new vscode.TreeItem(
     area.title,
-    area.chapters.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
+    area.chapters.length > 0
+      ? node.top
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.Collapsed
+      : vscode.TreeItemCollapsibleState.None
   );
   item.description = `${area.pages} pages${describeIssues(area)}`;
   const stale = countStale(node.area.chapters.flatMap((chapter) => chapter.pages));
@@ -251,7 +293,7 @@ function pageItem(node: PageNode): vscode.TreeItem {
       : stale
         ? new vscode.ThemeIcon('history', new vscode.ThemeColor('descriptionForeground'))
         : new vscode.ThemeIcon('file');
-  item.contextValue = 'page';
+  item.contextValue = page.exists ? 'page' : 'missingPage';
   item.command = {
     command: 'temcoKnowledge.openPage',
     title: 'Open Page',

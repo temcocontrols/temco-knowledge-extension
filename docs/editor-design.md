@@ -65,52 +65,61 @@ has to keep working in an ordinary VS Code. Everything here is a command, so a c
 
 ## 2. Creating a document
 
-Nothing is built here yet. Two facts decide how it should work, and both come from the design package.
+**A page is a file, not a pair — and that is the product repository's own doing.** This section said the
+opposite when it was first written, so the correction is worth stating plainly, with where it comes from.
+`T3000Webview-EEZ-Studio/scripts/docs-registry.mjs` **generates the entries**:
 
-**A page is a pair, not a file.** The registry *is* the structure (`05-content-and-registry.md` §2), and a `.md`
-that no `pages` entry names is an error the generator reports as `unregistered page`. So "create a document" is
-always a file **and** a registry entry.
+```
+  buildPages(existing)                    walks docs/t3000/** and docs/legacy/**
+    id      = the docs-relative path without `.md`      the page id *is* the path
+    title   = prev.title  ??  the file's first `#`      ← so a skeleton starts with one
+    area    = the top folder      chapter = the second path segment (or `(root)`)
+    order   = prev.order  ??  10, 20, 30… inside the chapter
+    owner   = 'docs'   ship = true for t3000   tags/keywords/code = []
+    every field:  prev.<field> ?? a default             ← an existing (curated) value always wins
+  and the file itself is written with  JSON.stringify(registry, null, 2) + '\n'
+```
 
-**Some of those fields are not the author's to set.** `15-online-editor.md` §5.4 splits them: `title`, `order`,
-`owner`, `tags`, `keywords`, `reviewer`, `code` are a page owner's; `chapter`, `ship`, `area` and `category` are
-**structure**, marked *needs the docs owner*. A create form that quietly writes `chapter` is a governance change
-wearing a UI.
+So **creating a page writes no entry at all**: the file goes in, the repository's own generator — which this
+application already runs as one of its allowlisted scripts — adds the entry, derives its place, and takes its
+title from the first heading. What only a person curates is `order`, `chapter`, `title`, `owner`, `tags` and
+`code`, and those are the values the generator then leaves alone. Section 5 is that decision, as taken.
+
+Two consequences for the flow below, both now built: a new page is **a file and a generator run**, offered in
+that order; and there is **no "loose page" kind**, because the `exclude` key the design package's schema
+describes is not produced by this repository's generator — a Markdown file under `docs/` that no area covers is
+an `unregistered page` error, not a working note.
 
 ### The kinds worth offering
 
-| Kind | What it writes | Why it is a kind |
+| Kind | The headings it starts with | Why it is a kind |
 |---|---|---|
-| **Article** | a page file in an existing area and chapter, plus its entry | the ordinary case, and the one a creation flow is judged on |
-| **New chapter** | the file, the entry, and a folder | a chapter is a TOC parent; creating one is a structural act |
-| **Task / how-to** | the same, with a numbered-step skeleton | the commonest documentation shape, and the one whose headings a template gets right |
-| **Reference** | the same, with a tables-first skeleton | the shape an API or a register actually has |
-| **Troubleshooting** | the same, with *Symptom · Cause · Fix* | matches the area the product already has (`troubleshooting`) |
-| **Release note** | a page in the `releases` chapter, dated, with *What's new · Fixed · Known issues* | dated, and the reason `version` exists in the registry |
-| **Loose page** | a Markdown file under `docs/` registered in `exclude` | a working note that must exist and must not ship (`docs/todo/` in the product repo is this) |
+| **Article** | Overview · Configuration · Related pages | the ordinary case |
+| **Task** | Before you start · Steps · If it does not work | the commonest documentation shape |
+| **Reference** | Fields · Notes | the shape an API or a register actually has |
+| **Troubleshooting** | Symptom · Cause · Fix | matches the `troubleshooting` area the product already has |
+| **Release note** | What is new · Fixed · Known issues | what changed in a build |
 
-Each template is a **skeleton the registry's own rules require** — the headings, the front-matter-free top, the
-hard-wrapped prose that the gates expect — and nothing else. A template that invents prose is a template someone
-has to delete.
+Each skeleton is **headings only** — no invented sentences, because a template that writes prose is a template
+someone has to delete. Every one starts with `# <title>`, which is what the generator reads.
 
-### The flow
+### The flow, as built
 
 ```
-  Create a page ────────────────────────────────────────────────────────────────
-  1  Kind        ( ) article  ( ) task  ( ) reference  ( ) troubleshooting  ( ) release note  ( ) loose
-  2  Where       area [ t3000 ▾ ]   chapter [ features ▾ ]   order [ 40 ]     ← structure: flagged
-  3  Title       Trend Logs                →  the id and the file path, shown, not guessed
-                   id    t3000/features/trend-logs
-                   file  docs/t3000/features/trend-logs.md          (new)
-  4  Owner       [ trendlog ▾ ]   audience [ user ▾ ]
-  ──────────────────────────────────────────────────────────────────────────────
-  It will write, after asking for each path by name:
-      docs/t3000/features/trend-logs.md          (the skeleton above)
-      docs/help/registry.json                    (one `pages` entry — or registry.d/, if the file is split)
+  New page ─────────────────────────────────────────────────────────────────────
+  1  Where    the chapter you right-clicked (or: which source ▸ which area ▸ which chapter)
+  2  Kind     article · task · reference · troubleshooting · release note
+  3  Title    Trend Logs
+  4  File     trend-logs          →  docs/t3000/features/trend-logs.md        (shown, not guessed)
+  ────────────────────────────────────────────────────────────────────────────
+  [ Write the page ]  ── it starts as “# Trend Logs” and the kind's headings
+  ── then ──
+  “It becomes a page when the registry names it.”          [ Run the generator ]
 ```
 
-Two rules the flow keeps: **the id and the path are shown before anything is written**, and **the structure fields
-are named as structure** so nobody discovers later that they changed a chapter. The write is two modal
-confirmations naming two paths — never a silent one — and nothing is ever committed.
+**New chapter** is the same flow with the folder named first, because a chapter is a page's *path*: a folder
+with nothing in it is not a chapter, not in the registry, and not in the table of contents. The folder arrives
+with its first page.
 
 ---
 
@@ -153,24 +162,66 @@ they need the `fetch` mode and a review flow that lives in the product repositor
 
 ---
 
-## 5. The decision this waits on
+## 5. The decision, as taken on 2026-10-14
 
-Today the extension may write into a product repository exactly twice, each its own command, each a modal naming
-the path: the empty file for a page the registry already declares, and an empty `registry.json` in a folder that
-has none. Nothing under `_admin/` or `_edit/` is ever written, and an existing registry is never edited.
+The question was how far this application may go into a product repository. The answer, in the three parts it
+was asked in:
 
-| An image into the page's `media/` | A new page's `.md` file | An entry in `registry.json` / `registry.d/*.json` |
+| Asked | Taken | So the code does this |
 |---|---|---|
-| the third writer. The path is derived from the page, the name is slugified, the type is sniffed, and the file is binary | the same class as the one writer we already have, one kind of file instead of empty | **the largest step**, and the one that contradicts "an existing registry is never edited" |
+| The Library's title bar holds twelve buttons | **three inline, the rest in the view's `⋯`** | `newProject` · `openProjects` · `openNeeds` stay in group `navigation`; everything else moved to named groups, which is how a `view/title` item lands in the overflow menu. **The header starts work; a row and a page operate on a thing** — and the target-less ones ask which, which they already did |
+| Which operations the Workspace tree grows | **all five**: new page · new chapter · rename the title · move (up, down, and by dragging) · retire | `src/pageOps.ts` — six commands, a `TreeDragAndDropController`, and one modal per write |
+| How far into `registry.json` | **one named value, on a confirmation** | `src/registryEdit.ts` — `title`, `order`, `chapter`, `deprecated`, `superseded_by`, and nothing else; never a whole-file rewrite |
 
-**Recommendation, in this order.** Accept the image writer and the page-file writer together: they are one decision —
-*this application may put a page and its picture into a repository, at paths it derived, after asking* — and each
-one is useless alone, since a page whose picture cannot be added is not authored here, and a picture without a page
-is nothing. Take the registry entry as a **second** decision, and start it in the *split* form
-(`registry.d/<area>-<chapter>.json`), where the diff touches one small file that a reviewer can read, rather than
-the single 500-page `registry.json` that `05-content-and-registry.md` warns about. If that second decision is
-refused, create-a-page still works honestly: the file is written, and the registry entry is shown, ready to paste,
-in the file that has to have it.
+### What each operation writes
+
+```
+ operation                        what changes on disk                          state
+ ──────────────────────────────── ───────────────────────────────────────────── ──────────────
+ Open · Reveal · the outline       nothing                                      built
+ Create the missing page file      one empty .md (declared, absent)             built (earlier)
+ New page in this chapter          one .md from a kind's skeleton               built 2026-10-14
+   → then the repo's docs:registry (its own script; adds the entry)             offered, not forced
+ New chapter                       …the same, with the folder named first       built 2026-10-14
+ Rename the title                  title in registry.json (+ the page's first #) built 2026-10-14
+ Move up / Move down / drag        order in registry.json — two numbers, swapped built 2026-10-14
+ Drop on another chapter           chapter + order — *structure*, docs owner     built 2026-10-14
+ Retire a page                     deprecated + superseded_by                    built 2026-10-14
+ Rename or move the FILE           the page id — inbound links break            **never**, by rule
+ An image into the page's media/   a new file, binary                            **not built** — see §3
+```
+
+Four rules hold the writes together, and each one is a decision rather than an implementation detail:
+
+- **A move is a swap, never a renumbering.** Placing a page between two others by rewriting every `order` in the
+  chapter is the generator's own job — it hands out 10, 20, 30… to whatever nobody curated. So a move writes two
+  numbers and the diff is two lines.
+- **The file is never renamed or moved.** The page id *is* the path (`05-content-and-registry.md` §2), so a page
+  is renamed by changing what it is *called*: one string in the registry, plus the page's own `#` heading when it
+  says the same words — two answers to one question otherwise.
+- **A chapter change says the word structure.** `15-online-editor.md` §5.4 marks `chapter` as the docs owner's to
+  change, so the confirmation says so and asks for a line in the pull request.
+- **Retirement is not deletion.** The file stays; the registry records the replacement; the redirect for a
+  retired page is generated by the repository's own pipeline (`14-governance.md` §5).
+
+### The evidence for "one value, and nothing else"
+
+`src/registryEdit.ts` renders the file the way the repository's **own generator** writes it — `JSON.stringify`
+with two spaces, one trailing newline — **and with the file's own line endings**, because a clone checked out on
+Windows is CRLF while the generator emits LF, and a write that flipped every ending would be a diff of the whole
+file. With both right, the guarantee is testable, so it was tested:
+
+| Check | Result |
+|---|---|
+| the real `docs/help/registry.json` — 318 pages, 124 KB — opened, re-rendered, compared | **byte-for-byte identical** |
+| a drag into another chapter, diffed line by line against the original | **two lines changed**: `chapter` and `order` |
+| a drag onto a sibling, same chapter | two lines changed, the two `order` values swapped |
+| a drop on the page's own chapter | **nothing written**, and it says so |
+| a rename, diffed | one line changed, plus the page's own heading |
+| a new page | the file written, **the registry untouched**, then the generator offered |
+
+Running the generator afterwards is what keeps the file canonical: the values written here are the ones the
+generator's own `prev.<field> ?? default` rule preserves, so nothing is lost by it and nothing here duplicates it.
 
 ---
 
@@ -179,6 +230,6 @@ in the file that has to have it.
 | # | Step | The test that ends it |
 |---|---|---|
 | 1 | the toolbar | **done 2026-10-14** — a Markdown file shows the four buttons; every button toggles; `---` after prose is not a heading; the page picker inserts a link the gate resolves; a page read from a source is refused in words |
-| 2 | insert an image | a dropped PNG lands in the page's `media/` under a slugified name and is referenced relatively; a 3 MB PNG and a `.exe` renamed `.png` are both refused, in words, with the limit |
-| 3 | create a page | an article is created from the kind's skeleton, in a chapter that exists, and the repository's own `docs:registry` then reports no `unregistered page` — with two confirmations naming two paths, and nothing committed |
+| 2 | operating on a page | **done 2026-10-14** — a page is created from its kind's skeleton and the generator is offered next; a title is renamed and the registry diff is one line; a page is dragged into another chapter and the diff is the two values; retiring one writes `deprecated` and the replacement and keeps the file |
+| 3 | insert an image | a dropped PNG lands in the page's `media/` under a slugified name and is referenced relatively; a 3 MB PNG and a `.exe` renamed `.png` are both refused, in words, with the limit |
 | 4 | drafts | a page is corrected, the gates run, the diff is reviewed, and the result is a commit a person made — not one this application made |

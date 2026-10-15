@@ -201,8 +201,25 @@ The platform has **two lists** in the sidebar and **rich pages** in the editor a
 attention: a document is managed from its page, a source is read from its row, and the AI is beside whatever
 you are working on.
 
-**The home page opens when the platform is activated** — it is the first thing a person should see, and
-`temcoKnowledge.home.openOnStart` turns it off for anyone who would rather it never opened a tab by itself.
+**What opens when the platform is activated is the project you are on** — its dashboard, the one surface that
+says what is in it and what next — then the page you were last working on, then the home page when there is
+neither. `temcoKnowledge.start.open` (`project` · `page` · `home` · `none`) chooses, and `none` opens no tab at
+all for anyone who would rather nothing opened by itself.
+
+**The Workspace is the first view, and the Library is beneath it.** The Workspace shows the project being
+worked on and never the open folders, so the registry checks, the status bar and the faults follow the project
+too — a tree built from whatever happens to be open would be a second, unrelated answer to the same question.
+The view is never hidden and never blank: with nothing to show it carries **rows that say why and offer the one
+act that fills it** (*no project yet* → create one; *no project is being worked on* → choose one in the Library;
+*this project has nothing to show* → open it and read its sources). Those rows are drawn by the tree itself —
+`viewsWelcome` was tried first and dropped, because a welcome's `when` clause is resolved when the view is first
+painted, which is before the refresh has read anything: it announced "nothing recorded yet" over a catalog that
+held five projects.
+
+With exactly one project recorded there is nothing to choose between, so it selects itself and the tree is ready
+without anyone picking it; that is not a person choosing, so the sidebar is left where it was. Choosing a project
+afterwards brings the Workspace forward, and clearing one brings the Library back — the two views are a sequence,
+and only a click walks it.
 
 **Nothing here is specific to a product.** The names in the figures below are examples; the code knows no
 repository, no branch and no product name, and it reads whatever the catalog and the editor are told about.
@@ -233,7 +250,7 @@ the whole edit form at you. What changed, in the order it matters:
 
 | # | What it was | What it is |
 |---|---|---|
-| **A** | the Workspace view showed the open folders; a project's pages lived in the catalog, beside it | **one world**: with a project being worked on, the view shows *that project's* sources — a local folder gets the full checks even when the window has it closed, and a source that is not here shows what the read recorded, marked `origin: 'catalog'` so nothing unchecked looks checked |
+| **A** | the Workspace view showed the open folders; a project's pages lived in the catalog, beside it | **one world**: with a project being worked on, the view shows *that project's* sources — a local folder gets the full checks even when the window has it closed, and a source that is not here shows what the read recorded, marked `origin: 'catalog'` so nothing unchecked looks checked. With no project it says why instead of showing the folders |
 | **B** | a Library row was text; reading was only on the view's title bar | rows carry a context value — **Read · Open the source · Set the branch · Forget** on a source, **Work on · Edit · Add a source · Build** on a project |
 | **C** | *Read the sources* read **one** source and said "sources" | **Read every source** reads them all, one at a time (a rate-limited host is not asked twice at once), with one progress notice and one report |
 | **D** | *Add a source* opened the whole edit form | the add form is on the hub's **Sources** tab: repository + branch, or a folder, or an archive |
@@ -278,6 +295,14 @@ of it you were last on. A project belongs to the window, not the machine — two
 answer about each other's pages. Opening a project makes it the one being worked on, and the library row, the
 view's description and the dashboard all say so; a project that is removed while selected clears the selection
 rather than leaving a view about something that is not there.
+
+**On activation, nothing has to be clicked.** The one project with nothing chosen selects itself (with two or
+more nothing is guessed — see *Surfaces*); the Workspace view arrives with the only repository's areas open and
+their chapters beneath them; the Library opens *Projects*, so the names of what you have are on screen; and the
+tab that opens is the selected project's dashboard, or the page you were last on (`temcoKnowledge.start.open`).
+A tree that re-decided itself after every refresh would be worse than one that never opened at all, so a
+person's own expand or collapse is remembered for the session and beats both defaults — a refresh re-reads the
+data, never the layout (`src/views.ts`).
 
 ### The window
 
@@ -398,6 +423,64 @@ refused in words, because no relative path reaches it. **Callout** takes its fiv
 **An image is the one button that is not here**, and the reason is the write rule rather than the code: the file
 has to be written into the page's own `media/` before the reference to it points at anything. That amendment, the
 kinds of new document, and what each costs are the subject of `docs/editor-design.md`.
+
+### Operating on things, as built 2026-10-14
+
+The operations were in the sidebar's title bar — twelve buttons on the Library, four of them needing a target
+nobody had picked — and the tree could only be read. What replaced it is one rule and one place per kind of thing:
+
+```
+  the title bar of a view        starts work, and stands for nothing in particular
+  the ⋯ in that title bar        everything that needs a target, or is housekeeping
+  a row                          operates on the thing the row is
+  a page (dashboard, hub)        operates on the thing the page is about
+```
+
+```
+ LIBRARY HEADER — before
+ ┌──────────────────────────────────────┐
+ │ [+][▤][✓][◧][+⌄][⤓][⤓][●][⚙][☰][⌘][▶] │   12 buttons — and four of them have no target to act on
+ └──────────────────────────────────────┘
+
+ LIBRARY HEADER — after
+ ┌──────────────────────────────┬───┐
+ │ [+ New project] [Projects] [✓]│ ⋯ │   3 buttons, and the ⋯ holds everything else
+ └──────────────────────────────┴───┘
+   ⋯   Read every source · Read a source… · Add a source…
+       Work on a project… · Build the project…
+       Run a script… · Staleness report · Catalog · Set a token
+```
+
+The Workspace tree now carries the page operations, because that is where a page is. `page` and `missingPage` are
+two context values rather than one, so a menu can offer *Create the missing page file* only where a file is
+missing, and *Move* only where there is one.
+
+```
+ ▾ T3000  t3000 · 318 pages
+   ▾ features  41 pages  ⇄ owed
+       Trend Logs     ● 2 issues
+       Data Points    ▲ unowned
+       System Time    ⚠ missing file
+       Trend Log      (read from the source)
+
+   right-click a chapter   New page here… · Open the registry · Reveal the folder
+   right-click a page      Open · Reveal in Explorer · Rename the title…
+                           Move up · Move down · Retire…
+   drag a page onto        a chapter (chapter + order) · a sibling (two order values, swapped)
+```
+
+**A drag is a registry write, and it says which values it will change.** Dropping a page on a chapter writes its
+`chapter` and a new `order`, and the confirmation says the word *structure*, because `15-online-editor.md` §5.4
+marks that field as the docs owner's. Dropping it on a sibling in the same chapter swaps two `order` values and
+nothing else. Nothing here renumbers a chapter: placing a page between two others is the generator's own job, and
+the generator does it for whatever nobody curated.
+
+**The projects page is the operations home**, which it already was — each card carries *Work on it · Open · Read
+sources · Build · Edit · Scripts… · Remove…* — with one addition: **Scripts…** lists the repository's own
+allowlisted scripts that *this* project's folders actually have, and runs the one you pick through the Library's
+own command. A script belongs to a repository, so it is offered per project only because a project is what cites
+one; when the project is not the one being worked on, it is made so first, out loud, because the Workspace view
+changes with it.
 
 ### Documents — the home page
 
@@ -529,6 +612,8 @@ kinds of new document, and what each costs are the subject of `docs/editor-desig
 | **Branch policy** | the default branch, with the mismatch reported and a per-source override | 2026-10-13 |
 | **Notification default** | `docs-only` — a daily summary of documentation change, no modals | 2026-10-13 |
 | **The entry point** | the **home page opens on activation** (`temcoKnowledge.home.openOnStart`, default on) — opening the platform shows it without anyone looking for it | 2026-10-13 |
+| **The entry point, revised** | **the project's dashboard opens on activation** (`temcoKnowledge.start.open`, default `project`), then the page you were last on, then the home page — and the one recorded project selects itself so the tree is ready without anyone picking it. The home page moved from *always* to *last*, and the on/off switch became the four-way setting | 2026-10-15 |
+| **The Workspace, gated by content** | **the Workspace stays the first view and the Library sits beneath it**, and the open folders are never read into it. Its empty states are **rows the tree draws itself**, offering the act that fills it — *create a project* · *choose one in the Library* · *open this project and read its sources*. Hiding the view on `when: temcoKnowledge.working` and phrasing these states as `viewsWelcome` were both tried and both rejected the same day: a selected project with no visible tree reads as a fault, and a welcome's `when` is resolved before the refresh has read anything | 2026-10-15 |
 
 ## Build order
 
@@ -538,10 +623,16 @@ kinds of new document, and what each costs are the subject of `docs/editor-desig
 | **R2** | **Sources** — add a git source (any host, chosen branch) or a folder; local, materialised and online modes | **partly built 2026-10-14**: a source is added, read in `local` and `api` mode, and remembered across restarts. Not built: the materialised (`fetch`) mode, and the branch mismatch is reported by the Content view rather than by a read |
 | **R3** | **Documents** — create one, cite sources, choose a recipe, and build it | **partly built 2026-10-14**: a project is created, cites sources, chooses a recipe, and its build runs the repository's own script as a task and records the files by path. Not verified: a real artifact (`t3000_dev.chm`) has not been produced through this path yet |
 | **R4** | **AI over history** — commit summaries, affected pages, drafts, the owed list, as a resumable job | a real commit has a summary and a draft, and a human still approves |
-| **R5** | **The views** — Documents and Sources: health, fidelity, latest push, *Since you last looked* | **partly built 2026-10-14**: the sidebar holds Workspace (the pages of the project being worked on) and Library (projects · what needs attention · sources · catalog), and *What needs doing* answers "what do I have, and what changed?" on a page. Not built: the *Since you last looked* digest, and fidelity per source beyond the read mode |
-| **R6** | **Editing and publishing** — the editor with its toolbar, creating a document, images, draft branches, the design package's hosted editor, PR flow | **started 2026-10-14**: the **toolbar** is built on VS Code's own editor — emphasis, blocks, a link to a real page, the outline — as the sixteen `temcoKnowledge.format.*` commands in `src/format.ts`, in the editor's title bar, its two context menus and the palette. Not built: creating a document, inserting an image, drafts and the PR flow — the first two are waiting on the write rule below |
+| **R5** | **The views** — Documents and Sources: health, fidelity, latest push, *Since you last looked* | **partly built 2026-10-14**: the sidebar holds Workspace (the pages of the project being worked on, with a row saying why while there is nothing) first and Library (projects · what needs attention · sources · catalog) beneath it, and *What needs doing* answers "what do I have, and what changed?" on a page. Not built: the *Since you last looked* digest, and fidelity per source beyond the read mode |
+| **R6** | **Editing and publishing** — the editor with its toolbar, creating a document, images, draft branches, the design package's hosted editor, PR flow | **started 2026-10-14**: the **toolbar** is built on VS Code's own editor — emphasis, blocks, a link to a real page, the outline — as the sixteen `temcoKnowledge.format.*` commands in `src/format.ts`. A page can be **created, named, moved and retired** — `src/pageOps.ts`, six commands and a drag controller — and a project's own scripts can be run from its card on the projects page. Not built: inserting an image, drafts and the PR flow, which need the `fetch` read mode and a review flow that lives in the product repository |
 
-**The R6 step that is left is mostly a rule change, not a feature.** The toolbar edits the buffer a person is already typing in, so it adds no writer at all. The next two do: an image has to land in the page's own `media/` before a reference to it means anything, and a new page is a **pair** — the file *and* its `registry.json` entry, because the registry is the structure and an unregistered `.md` is an error the generator reports. So the amendment is the decision, and `docs/editor-design.md` lays it out with the evidence; the two writes we have today stay exactly as they are until it is made.
+**R6 is mostly a rule change, and the rule was changed on 2026-10-14 by naming it.** The toolbar edits the buffer
+a person is already typing in, so it adds no writer at all. Creating a page writes **one file** — the repository's
+own `docs:registry` adds the entry, derives its place from the path and its title from the first heading, so
+nothing here writes an entry for a page that did not exist. And a page that is *moved* changes **one curated value
+at a time** in `docs/help/registry.json`, through `src/registryEdit.ts`, which renders the file the way its own
+generator does — including the file's line endings — so a move is a two-line diff. `docs/editor-design.md` §5
+records the decision, the four rules that hold it, and the evidence.
 
 **R1–R3 make it a documentation platform**: sources in, documents and artifacts out. R4 makes it intelligent.
 R5 makes it a management system. R6 closes the loop.

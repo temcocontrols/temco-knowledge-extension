@@ -28,8 +28,25 @@ export class Row {
      */
     readonly contextValue?: string,
     /** The catalog slug this row stands for, when it stands for one. */
-    readonly slug?: string
+    readonly slug?: string,
+    /**
+     * Whether the row shows its children without being asked.
+     *
+     * Only a row the sidebar is *opened* for asks this — everything else waits to be clicked, because a tree
+     * that opens itself everywhere is a wall of text. The person's own click always beats it.
+     */
+    readonly expanded = false
   ) {}
+}
+
+/**
+ * A row's identity across the refreshes that rebuild it.
+ *
+ * Rows are made fresh on every read, so a person's expand/collapse choice cannot be kept against the object;
+ * it is kept against what the row *is* — the kind of thing it stands for, and which one.
+ */
+function rowKey(row: Row): string {
+  return `${row.contextValue ?? row.label}|${row.slug ?? row.label}`;
 }
 
 /**
@@ -69,13 +86,30 @@ class SectionView implements vscode.TreeDataProvider<Row> {
     this.changed.fire();
   }
 
+  /**
+   * What the person did to a row, by row identity — for the session only.
+   *
+   * The Library re-reads the catalog on every refresh, so without this a collapse would be undone the next
+   * time a registry file changed. A refresh re-reads the data; it must not re-decide the layout.
+   */
+  private readonly chosenState = new Map<string, boolean>();
+
+  /** Records the person's own answer about a row, which beats the row's default from then on. */
+  chosen(row: Row, open: boolean): void {
+    this.chosenState.set(rowKey(row), open);
+  }
+
+  /** Whether a row shows its children: what the person chose, else what the row asked for. */
+  private state(row: Row): vscode.TreeItemCollapsibleState {
+    if (row.children.length === 0) {
+      return vscode.TreeItemCollapsibleState.None;
+    }
+    const open = this.chosenState.get(rowKey(row)) ?? row.expanded;
+    return open ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed;
+  }
+
   getTreeItem(row: Row): vscode.TreeItem {
-    const item = new vscode.TreeItem(
-      row.label,
-      row.children.length > 0
-        ? vscode.TreeItemCollapsibleState.Collapsed
-        : vscode.TreeItemCollapsibleState.None
-    );
+    const item = new vscode.TreeItem(row.label, this.state(row));
     item.description = row.description;
     item.iconPath = new vscode.ThemeIcon(row.icon);
     if (row.contextValue !== undefined) {
@@ -342,7 +376,11 @@ class SectionView implements vscode.TreeDataProvider<Row> {
           'library',
           documentRows,
           { command: 'temcoKnowledge.openProjects', args: [] },
-          'projects'
+          'projects',
+          undefined,
+          // Open by default, and only this one: the projects are what the sidebar is opened for, and the
+          // names of what you have are more use than the word "Projects" twice a day. A click still closes it.
+          true
         ),
         new Row(
           'Sources',
@@ -389,7 +427,14 @@ export function registerSectionViews(
   roots: () => readonly DocsRoot[]
 ): { refresh(): void } {
   const library = new SectionView(context, selection, roots);
-  context.subscriptions.push(vscode.window.registerTreeDataProvider(LIBRARY_VIEW_ID, library));
+  // A created view rather than `registerTreeDataProvider`, because the person's own expand and collapse have
+  // to be heard: a row that opens by itself must still be closable, and must stay closed until it is reopened.
+  const view = vscode.window.createTreeView(LIBRARY_VIEW_ID, { treeDataProvider: library });
+  context.subscriptions.push(
+    view,
+    view.onDidExpandElement(({ element }) => library.chosen(element, true)),
+    view.onDidCollapseElement(({ element }) => library.chosen(element, false))
+  );
   return {
     refresh(): void {
       library.refresh();

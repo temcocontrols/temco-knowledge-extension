@@ -315,6 +315,30 @@
       {
         "command": "temcoKnowledge.format.outline",
         "title": "Go to a Heading"
+      },
+      {
+        "command": "temcoKnowledge.newPage",
+        "title": "New Page"
+      },
+      {
+        "command": "temcoKnowledge.newChapter",
+        "title": "New Chapter"
+      },
+      {
+        "command": "temcoKnowledge.renamePage",
+        "title": "Rename the Page Title"
+      },
+      {
+        "command": "temcoKnowledge.movePageUp",
+        "title": "Move the Page Up"
+      },
+      {
+        "command": "temcoKnowledge.movePageDown",
+        "title": "Move the Page Down"
+      },
+      {
+        "command": "temcoKnowledge.retirePage",
+        "title": "Retire the Page"
       }
     ],
     "submenus": [
@@ -458,49 +482,49 @@
           "group": "navigation@2"
         },
         {
-          "command": "temcoKnowledge.runScript",
-          "when": "view == temcoKnowledge.library",
-          "group": "navigation@11"
-        },
-        {
-          "command": "temcoKnowledge.catalog",
-          "when": "view == temcoKnowledge.library",
-          "group": "navigation@3"
-        },
-        {
-          "command": "temcoKnowledge.addSource",
-          "when": "view == temcoKnowledge.library",
-          "group": "navigation@4"
-        },
-        {
           "command": "temcoKnowledge.readAllSources",
           "when": "view == temcoKnowledge.library",
-          "group": "navigation@5"
+          "group": "1_read@1"
         },
         {
           "command": "temcoKnowledge.readSource",
           "when": "view == temcoKnowledge.library",
-          "group": "navigation@6"
+          "group": "1_read@2"
+        },
+        {
+          "command": "temcoKnowledge.addSource",
+          "when": "view == temcoKnowledge.library",
+          "group": "1_read@3"
         },
         {
           "command": "temcoKnowledge.selectProject",
           "when": "view == temcoKnowledge.library",
-          "group": "navigation@7"
+          "group": "2_work@1"
         },
         {
           "command": "temcoKnowledge.buildProject",
           "when": "view == temcoKnowledge.library",
-          "group": "navigation@8"
+          "group": "2_work@2"
+        },
+        {
+          "command": "temcoKnowledge.runScript",
+          "when": "view == temcoKnowledge.library",
+          "group": "3_run@1"
         },
         {
           "command": "temcoKnowledge.stalenessReport",
           "when": "view == temcoKnowledge.library",
-          "group": "navigation@9"
+          "group": "3_run@2"
+        },
+        {
+          "command": "temcoKnowledge.catalog",
+          "when": "view == temcoKnowledge.library",
+          "group": "4_catalog@1"
         },
         {
           "command": "temcoKnowledge.setToken",
           "when": "view == temcoKnowledge.library",
-          "group": "navigation@10"
+          "group": "9_settings@1"
         },
         {
           "command": "temcoKnowledge.aiPage",
@@ -511,7 +535,7 @@
       "view/item/context": [
         {
           "command": "temcoKnowledge.openPage",
-          "when": "view == temcoKnowledge.pages && viewItem == page",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
           "group": "inline"
         },
         {
@@ -520,9 +544,44 @@
           "group": "1_open@1"
         },
         {
+          "command": "temcoKnowledge.createPage",
+          "when": "view == temcoKnowledge.pages && viewItem == missingPage",
+          "group": "1_open@0"
+        },
+        {
           "command": "temcoKnowledge.openRegistry",
           "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|chapter|folder)$/",
           "group": "1_open@2"        },
+        {
+          "command": "temcoKnowledge.newPage",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|chapter|folder)$/",
+          "group": "2_new@1"
+        },
+        {
+          "command": "temcoKnowledge.newChapter",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|folder)$/",
+          "group": "2_new@2"
+        },
+        {
+          "command": "temcoKnowledge.renamePage",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
+          "group": "3_edit@1"
+        },
+        {
+          "command": "temcoKnowledge.movePageUp",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
+          "group": "3_edit@2"
+        },
+        {
+          "command": "temcoKnowledge.movePageDown",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
+          "group": "3_edit@3"
+        },
+        {
+          "command": "temcoKnowledge.retirePage",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
+          "group": "9_retire@1"
+        },
         {
           "command": "temcoKnowledge.openProject",
           "when": "view == temcoKnowledge.library && viewItem == project",
@@ -607,12 +666,8 @@
     },
     "viewsWelcome": [
       {
-        "view": "temcoKnowledge.pages",
-        "contents": "No documentation is being read yet.\n\nWork on a project — or open a folder that holds one — and its pages, its faults and its totals appear here beside the code they document."
-      },
-      {
         "view": "temcoKnowledge.library",
-        "contents": "Nothing recorded yet.\n\nA project is what you manage: name it, then give it the sources it is built from — a repository at a branch you choose, a folder on this machine, or an archive. Read a source and its pages appear in the Workspace above, beside the code they document.\n\n[Create a project](command:temcoKnowledge.newProject) · [Add a source](command:temcoKnowledge.addSource)"
+        "contents": "Nothing recorded yet.\n\nA project is what you manage: name it, then give it the sources it is built from — a repository at a branch you choose, a folder on this machine, or an archive. Read a source and its pages appear in the Workspace, beside the code they document.\n\n[Create a project](command:temcoKnowledge.newProject) · [Add a source](command:temcoKnowledge.addSource)"
       }
     ],
     "configuration": {
@@ -644,10 +699,22 @@
           "minimum": 0,
           "markdownDescription": "How long the local server may sit unused before it is stopped and its memory released. `0` keeps it running until the window closes."
         },
-        "temcoKnowledge.home.openOnStart": {
-          "type": "boolean",
-          "default": true,
-          "markdownDescription": "Open the platform's home page when the extension is activated. Turn it off if you would rather it never opens a tab by itself."
+        "temcoKnowledge.start.open": {
+          "type": "string",
+          "enum": [
+            "project",
+            "page",
+            "home",
+            "none"
+          ],
+          "enumDescriptions": [
+            "The dashboard of the project being worked on. With no project, the page you were last on.",
+            "The page you were last working on in the project being worked on. With none, that project's dashboard.",
+            "The platform's home page.",
+            "Nothing — no tab opens by itself."
+          ],
+          "default": "project",
+          "markdownDescription": "What opens in the editor when the extension is activated. Each choice falls through to the next when it cannot be honoured: `project`, then the page you were last on, then the home page. Only `none` opens nothing."
         },
         "temcoKnowledge.organisation": {
           "type": "string",
@@ -659,7 +726,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && node scripts/check-commands.mjs",
     "watch": "tsc -watch -p ./",
     "package": "vsce package"
   },

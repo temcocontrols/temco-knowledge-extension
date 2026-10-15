@@ -37,13 +37,19 @@ belong to the **product** repository, which keeps the content and the publishing
 
 1. **No product content, no secrets.** Never add a product's page, image, registry or any credential to this
    repo. The only documentation that lives here is this repository's own plus the platform design in
-   `docs/design/help-platform/`. The extension operates on whatever folder is open.
-2. **Read-only by default, and two writes on request.** Reading is what the extension does; it creates a file in
-   exactly two cases, and each one is its own command with a confirmation naming the path: the empty file for a
-   page the registry already declares, and an empty `docs/help/registry.json` in a folder you have open that has
-   none. Nothing under `_admin/` or `_edit/` is ever written — `00-architecture.md` calls those *generated pages,
-   not documentation* — an existing `registry.json` is **never edited**, and nothing is ever committed on the
-   user's behalf.
+   `docs/design/help-platform/`. The extension operates on the **project being worked on** — its sources are
+   product repositories, read wherever they live.
+2. **Read-only by default, and four writes on request, each naming what it touches.** Reading is what the
+   extension does. It writes in exactly four cases, each its own command, each a modal confirmation naming the
+   path or the value: (a) the empty file for a page the registry already declares; (b) an empty
+   `docs/help/registry.json` in a folder you have open that has none; (c) a **new page file**, written from a
+   kind's heading skeleton — the registry entry for it is added by the repository's own `docs:registry`, never by
+   us; (d) **one curated value** in an existing `registry.json` — a title, an order, a chapter, a retirement —
+   through `src/registryEdit.ts`, which renders the file the way its own generator does (same indentation, same
+   line endings), so the diff is the lines that actually changed. Nothing under `_admin/` or `_edit/` is ever
+   written, `registry.json` is never rewritten wholesale, a page's **file is never renamed or moved** (the page
+   id is its path — `05-content-and-registry.md` rule 1), and nothing is ever committed on the user's behalf.
+   `docs/editor-design.md` §5 records the decision and the checks behind it.
 3. **Never publish.** This extension invokes the product repo's own build scripts — `docs:site`, and the
    non-deploying `build:help:dry` — and reports the artifacts they leave behind. It never runs the form that
    deploys into a T3000 installation, and it never reimplements the pipeline.
@@ -70,6 +76,8 @@ src/report.ts        the staleness report, grouped by owner (Markdown, untitled,
 src/scaffold.ts      starts a registry in an open folder that has none (smallest valid file, confirmed)
 src/feedback.ts      feedback rows routed to their owner, against a proposed file shape
 src/format.ts        the Markdown toolbar: formatting, blocks, a link to a real page, the outline
+src/pageOps.ts       operating on a page: create · rename the title · move · retire · the drag controller
+src/registryEdit.ts  writing one named value of registry.json, in its own generator's shape
 src/selected.ts      which project is being worked on, and which page of it (workspaceState)
 src/surface.ts       the one-tab-group rule — ViewColumn is named only here
 src/home.ts          the dashboard · src/projectsPage.ts the list · src/projectHub.ts one project
@@ -86,11 +94,15 @@ prompts/             the instruction text the AI receives (system.md, ask.md, dr
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
 
-Contributed surface lives in `package.json`: two view containers — `temcoKnowledge` in the activity bar, holding
-the **Workspace** and **Library** views, and `temcoKnowledgePanel` declared under
+Contributed surface lives in `package.json`: two view containers — `temcoKnowledge` in the activity bar, holding the
+**Workspace** tree first with the **Library** beneath it, and `temcoKnowledgePanel` declared under
 `contributes.viewsContainers.secondarySidebar` (the right side bar, where it belongs by default), holding the AI
-webview view (`temcoKnowledge.ai`) — and the commands, all named `temcoKnowledge.*`. The Markdown toolbar lives
-in the editor's own menus (`editor/title`, `editor/context`) rather than in a page of its own:
+webview view (`temcoKnowledge.ai`) — and the commands, all named `temcoKnowledge.*`. **A command id may be
+registered once**: a second `registerCommand` for the same id throws in the middle of activation and everything
+below it silently never runs, so `npm run compile` also runs `scripts/check-commands.mjs`. The Workspace view is
+about the project being worked on and never about the open folders, and it says why it is empty in **rows it
+draws itself** (`TreeNote` in `src/tree.ts`), not in a `viewsWelcome`. The Markdown toolbar lives in the
+editor's own menus (`editor/title`, `editor/context`) rather than in a page of its own:
 `docs/editor-design.md` says why.
 
 ## Conventions
@@ -118,7 +130,8 @@ npm run package        # vsce package -> temco-knowledge-extension-x.y.z.vsix
 ```
 
 Press **F5** for an Extension Development Host. Open a product repository (`T3000Webview-EEZ-Studio`) as the
-folder — this repo alone has no registry, so the Content view will correctly show nothing.
+folder and create a project that cites it — with no project being worked on the Workspace view holds a welcome
+that says so, since what it shows is the project's pages and never the window's folders.
 
 ## What is planned, in order
 
