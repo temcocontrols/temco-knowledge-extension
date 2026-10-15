@@ -24,6 +24,7 @@ import { registerProjectBuildCommands } from './projectBuild';
 import { slugOf } from './projectPage';
 import { registerReadCommands } from './read';
 import { registerReportCommands } from './report';
+import { registerRowCommands } from './rowOps';
 import { registerScaffoldCommands } from './scaffold';
 import { Selection } from './selected';
 import { fileColumn } from './surface';
@@ -51,7 +52,15 @@ export function activate(context: vscode.ExtensionContext): void {
   // Filled in once `refresh` exists: a page operation writes, and a write is not visible until the views have
   // been re-read. Passing a holder rather than the function keeps the tree's construction independent of it.
   let redraw = (): void => {};
-  const pageOps = new PageOperations({ roots: () => roots, output, redraw: () => redraw() });
+  // The same holder trick, for the same reason: a page act can be started from the view's toolbar or from the
+  // palette, where nothing names a row, and there the row the person has selected is the one they mean.
+  let selectedRow = (): KnowledgeNode | undefined => undefined;
+  const pageOps = new PageOperations({
+    roots: () => roots,
+    output,
+    redraw: () => redraw(),
+    selected: () => selectedRow(),
+  });
 
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
@@ -59,6 +68,7 @@ export function activate(context: vscode.ExtensionContext): void {
     // A chapter is somewhere a page can be put, and the drop is a registry write — see `src/pageOps.ts`.
     dragAndDropController: pageOps,
   });
+  selectedRow = () => treeView.selection[0];
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   status.command = 'temcoKnowledge.validate';
@@ -241,7 +251,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('temcoKnowledge.refresh', refresh),
 
     vscode.commands.registerCommand('temcoKnowledge.openRegistry', async (node?: KnowledgeNode) => {
-      const uri = rootOf(node, roots)?.registryUri;
+      const uri = rootOf(node ?? selectedRow(), roots)?.registryUri;
       if (!uri) {
         void vscode.window.showInformationMessage('Temco Knowledge: no registry in this workspace.');
         return;
@@ -251,7 +261,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
 
     vscode.commands.registerCommand('temcoKnowledge.openPage', async (node?: KnowledgeNode) => {
-      const page = pageFromNode(node);
+      const page = pageFromNode(node ?? selectedRow());
       if (!page) {
         return;
       }
@@ -264,7 +274,7 @@ export function activate(context: vscode.ExtensionContext): void {
         if (answer === 'Create Page') {
           await createPage(page.page.uri, page.page.title);
         } else if (answer === 'Open Registry') {
-          await vscode.commands.executeCommand('temcoKnowledge.openRegistry', node);
+          await vscode.commands.executeCommand('temcoKnowledge.openRegistry', node ?? selectedRow());
         }
         await refresh();
         return;
@@ -284,13 +294,6 @@ export function activate(context: vscode.ExtensionContext): void {
           title: page.page.title,
           path: page.page.uri.fsPath,
         });
-      }
-    }),
-
-    vscode.commands.registerCommand('temcoKnowledge.revealPage', async (node?: KnowledgeNode) => {
-      const page = pageFromNode(node);
-      if (page) {
-        await vscode.commands.executeCommand('revealInExplorer', page.page.uri);
       }
     }),
 
@@ -330,20 +333,32 @@ export function activate(context: vscode.ExtensionContext): void {
   // The Markdown toolbar: it edits the page in front, and reads the registry only to offer a link to a real
   // page — the one write-side surface in this extension that writes nothing.
   registerFormatCommands(context, () => roots);
-  // Operating on a page: creating one, naming it, moving it, retiring it.
-  registerPageCommands(context, { roots: () => roots, output, redraw: () => redraw() });
+  // Operating on a page: creating one, naming it, moving it, retiring it. The selected row stands in for the
+  // row a command was started without — the view's toolbar and the palette are the two that do that.
+  registerPageCommands(context, { roots: () => roots, output, redraw: () => redraw(), selected: () => selectedRow() });
+  // and where a row is: opening it, revealing it, a terminal at its folder, its path on the clipboard.
+  registerRowCommands(context, { selected: () => selectedRow() });
   redraw = () => void refresh();
 
   context.subscriptions.push(
     vscode.commands.registerCommand('temcoKnowledge.openNeeds', () => needs.open()),
     // The one write this extension makes to a page: the empty file for a page the registry already declares.
+    // It arrives two ways — the row in the tree that has no file behind it, and a page that names the path — and
+    // both end in the same single write. Handling only the second is why the row's own *Create* did nothing.
     vscode.commands.registerCommand(
       'temcoKnowledge.createPage',
-      async (target?: { path?: string; title?: string }) => {
-        if (!target?.path) {
+      async (target?: KnowledgeNode | { path?: string; title?: string }) => {
+        // Named by a webview (a path), by a row (a node) — or by neither, and then it is the selected row.
+        const named = target as { path?: string; title?: string } | undefined;
+        const node =
+          pageFromNode(target as KnowledgeNode | undefined) ??
+          (typeof named?.path === 'string' ? undefined : pageFromNode(selectedRow()));
+        const path = node?.page.uri.fsPath ?? named?.path;
+        const title = node?.page.title ?? named?.title;
+        if (path === undefined || path.length === 0) {
           return;
         }
-        await createPage(vscode.Uri.file(target.path), target.title ?? 'Page');
+        await createPage(vscode.Uri.file(path), title ?? 'Page');
         await refresh();
       }
     )

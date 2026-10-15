@@ -97,7 +97,14 @@ already owns.**
 | `temcoKnowledge.refresh` | re-reads the registries |
 | `temcoKnowledge.openRegistry` | opens `registry.json` for the folder the node belongs to |
 | `temcoKnowledge.openPage` | opens the page, or offers to create the missing file |
-| `temcoKnowledge.revealPage` | reveals the page in the explorer |
+| `temcoKnowledge.reveal` | shows the page's file — or a chapter's, an area's or a source's folder — in the operating system's file manager (`revealFileInOS`, not the VS Code view of a similar name) |
+| `temcoKnowledge.openTerminal` | opens an integrated terminal at the folder that row stands for |
+| `temcoKnowledge.copyPath` · `copyRelativePath` | the row's path on the clipboard, absolute or relative to the open folder |
+| `temcoKnowledge.newPage` · `newChapter` | a page (kind, title, file name) or a chapter — a folder with its first page, since an empty chapter does not exist |
+| `temcoKnowledge.newPage.article` · `.task` · `.reference` · `.troubleshooting` · `.releaseNote` | the same as `newPage` with the kind already named, so the *New Page of a Kind* submenu is one click per kind |
+| `temcoKnowledge.renamePage` | the title as a registry value, and the page's first `#` with it — never the file name |
+| `temcoKnowledge.movePageUp` · `movePageDown` | a two-number swap of `order` in `registry.json` |
+| `temcoKnowledge.retirePage` | `deprecated` and `superseded_by`; the file stays, so old links keep redirecting |
 | `temcoKnowledge.models` | the list of runtimes and models: what is installed, what can be downloaded, which one is in use |
 | `temcoKnowledge.removeModel` | deletes an installed runtime or model, and clears it from the settings when it was the one in use |
 | `temcoKnowledge.openModelFolder` | opens the folder the downloads live in |
@@ -108,11 +115,15 @@ already owns.**
 | `temcoKnowledge.startRegistry` | creates the smallest valid `docs/help/registry.json` in an open folder that has none, after a confirmation — and is also the Content view's empty state |
 | `temcoKnowledge.feedback` | reads each repository's `docs/help/feedback.json`, routes the rows to their owners, and calls out the aging |
 
-Where they surface: the Content view's title carries *Validate*, *Open Registry*, *Refresh*, *Models and
-Runtime*, *Documentation Owed* and *Feedback by Owner*. Everything else is in the palette, where it costs no
-room — and `startRegistry` is a row in the view's empty state, so the view and the button that fixes it are
-never apart. There is no organisation-wide surface here by design: that question belongs to the site's
-generated dashboard, which this extension hands off to rather than re-implements.
+Where they surface: the **Workspace view's title bar** carries *New page*, *New chapter* and *Refresh* inline,
+and its `…` holds the page acts (open · reveal · terminal · copy a path · rename the title · move up · move down ·
+retire · the *New Page of a Kind* submenu · the registry) plus Home and Validate — the same list the row's own
+right-click menu shows, which is the Library's shape and the Explorer's. A row's **left click** opens a page or
+expands a folder; a **right click** (or the keyboard's menu key) opens the menu; the hover carries nothing.
+Everything else is in the palette, where it costs no room — and `startRegistry` is a row in the view's empty
+state, so the view and the button that fixes it are never apart. There is no organisation-wide surface here by
+design: that question belongs to the site's generated dashboard, which this extension hands off to rather than
+re-implements.
 
 ## What refreshes the view
 

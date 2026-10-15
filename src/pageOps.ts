@@ -25,13 +25,10 @@
 
 import * as vscode from 'vscode';
 import { runScript } from './builds';
-import { DocsRoot, PageEntry, collectPages } from './registry';
+import { DocsRoot, PageEntry, ROOT_CHAPTER, collectPages } from './registry';
 import { RegistryEdit, describeChange } from './registryEdit';
 import { fileColumn } from './surface';
 import { KnowledgeNode } from './tree';
-
-/** What a page tree calls a chapter that is the area folder itself. The generator's own spelling. */
-const ROOT_CHAPTER = '(root)';
 
 /** The MIME a dragged page carries. One kind of thing can be dragged into a chapter: a page. */
 const PAGE_MIME = 'application/vnd.code.tree.temcoKnowledge.page';
@@ -58,6 +55,14 @@ export interface PageDeps {
   output: vscode.OutputChannel;
   /** Re-read the views: every act here changes either a file the view lists or a value it shows. */
   redraw: () => void;
+  /**
+   * The row the person has selected in the Workspace view.
+   *
+   * A command can be started where nothing names a row — the view's own toolbar, or the palette — and there the
+   * row they have selected is the one they mean. A reader rather than a node, so this module never holds the
+   * tree view itself.
+   */
+  selected: () => KnowledgeNode | undefined;
 }
 
 interface Place {
@@ -129,11 +134,41 @@ export function registerPageCommands(context: vscode.ExtensionContext, deps: Pag
   context.subscriptions.push(
     vscode.commands.registerCommand('temcoKnowledge.newPage', (node?: KnowledgeNode) => newPage(deps, node)),
     vscode.commands.registerCommand('temcoKnowledge.newChapter', (node?: KnowledgeNode) => newChapter(deps, node)),
+    // The kinds, one command each. A menu entry cannot carry an argument, so the submenu in `package.json` is the
+    // list of kinds and each entry names the command that already knows its own. They are written out rather than
+    // built in a loop so that `scripts/check-commands.mjs` sees every id like it sees the others.
+    vscode.commands.registerCommand('temcoKnowledge.newPage.article', (node?: KnowledgeNode) =>
+      newPageOfKind(deps, node, 'Article')
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.newPage.task', (node?: KnowledgeNode) =>
+      newPageOfKind(deps, node, 'Task')
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.newPage.reference', (node?: KnowledgeNode) =>
+      newPageOfKind(deps, node, 'Reference')
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.newPage.troubleshooting', (node?: KnowledgeNode) =>
+      newPageOfKind(deps, node, 'Troubleshooting')
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.newPage.releaseNote', (node?: KnowledgeNode) =>
+      newPageOfKind(deps, node, 'Release note')
+    ),
     vscode.commands.registerCommand('temcoKnowledge.renamePage', (node?: KnowledgeNode) => renamePage(deps, node)),
     vscode.commands.registerCommand('temcoKnowledge.movePageUp', (node?: KnowledgeNode) => movePage(deps, node, -1)),
     vscode.commands.registerCommand('temcoKnowledge.movePageDown', (node?: KnowledgeNode) => movePage(deps, node, 1)),
     vscode.commands.registerCommand('temcoKnowledge.retirePage', (node?: KnowledgeNode) => retirePage(deps, node))
   );
+}
+
+/**
+ * The row a command means.
+ *
+ * It arrives with a row when it was started from the tree — the row's own icon, or the selection the view's
+ * toolbar carries — and with nothing when it was started from the palette. There, the selected row is the one
+ * they mean. Anything else is handed on unchanged, and an act that cannot tell which row it is about says so
+ * rather than guessing: every write still names the file it will touch in its own confirmation.
+ */
+function targeted(deps: PageDeps, node?: KnowledgeNode): KnowledgeNode | undefined {
+  return node ?? deps.selected();
 }
 
 // ------------------------------------------------------------------ creating
@@ -145,6 +180,15 @@ async function newPage(deps: PageDeps, node?: KnowledgeNode): Promise<void> {
   }
 }
 
+/** A new page of one kind, from the menu that lists the kinds: the kind is the entry that was clicked. */
+async function newPageOfKind(deps: PageDeps, node: KnowledgeNode | undefined, label: string): Promise<void> {
+  const kind = KINDS.find((candidate) => candidate.label === label);
+  const place = await choosePlace(deps, node);
+  if (kind !== undefined && place !== undefined) {
+    await createPage(deps, place, kind);
+  }
+}
+
 /**
  * A new chapter.
  *
@@ -153,9 +197,10 @@ async function newPage(deps: PageDeps, node?: KnowledgeNode): Promise<void> {
  * the name and then creates the first page in it — the folder arrives with it.
  */
 async function newChapter(deps: PageDeps, node?: KnowledgeNode): Promise<void> {
-  const from = node ? areaOf(node) : undefined;
-  const root = from?.root ?? (await chooseRoot(deps.roots()));
-  if (!root) {
+  const row = targeted(deps, node);
+  const from = row ? areaOf(row) : undefined;
+  const root = from?.root ?? (row?.kind === 'folder' ? row.root : await chooseRoot(deps.roots()));
+  if (!root || !writable(root)) {
     return;
   }
   const area = from?.area ?? (await chooseArea(root));
@@ -176,12 +221,14 @@ async function newChapter(deps: PageDeps, node?: KnowledgeNode): Promise<void> {
 
 /** The chapter and area a new page belongs in: the node that was right-clicked, or a question. */
 async function choosePlace(deps: PageDeps, node?: KnowledgeNode): Promise<Place | undefined> {
-  const from = node ? placeOf(node) : undefined;
+  const row = targeted(deps, node);
+  const from = row ? placeOf(row) : undefined;
   if (from) {
-    return from;
+    return writable(from.root) ? from : undefined;
   }
-  const root = await chooseRoot(deps.roots());
-  if (!root) {
+  // A repository row is not in an area, so it answers the first question and the rest is still asked.
+  const root = row?.kind === 'folder' ? row.root : await chooseRoot(deps.roots());
+  if (!root || !writable(root)) {
     return undefined;
   }
   const area = await chooseArea(root);
@@ -200,12 +247,15 @@ async function choosePlace(deps: PageDeps, node?: KnowledgeNode): Promise<Place 
   return chapter ? { root, area, chapter: chapter.chapter } : undefined;
 }
 
-async function createPage(deps: PageDeps, place: Place): Promise<void> {
+/** The kind, the title and the file name — then the one write, which the confirmation names first. */
+async function createPage(deps: PageDeps, place: Place, chosen?: Kind): Promise<void> {
   const { root, area, chapter } = place;
-  const kind = await vscode.window.showQuickPick(KINDS, {
-    title: 'What kind of page is it?',
-    placeHolder: 'The kind decides the headings it starts with, and nothing else',
-  });
+  const kind =
+    chosen ??
+    (await vscode.window.showQuickPick(KINDS, {
+      title: 'What kind of page is it?',
+      placeHolder: 'The kind decides the headings it starts with, and nothing else',
+    }));
   if (!kind) {
     return;
   }
@@ -568,13 +618,14 @@ function requirePage(
   deps: PageDeps,
   node: KnowledgeNode | undefined
 ): { root: DocsRoot; page: PageEntry } | undefined {
-  if (node?.kind !== 'page') {
+  const row = targeted(deps, node);
+  if (row?.kind !== 'page') {
     void vscode.window.showInformationMessage(
-      'Temco Knowledge: this acts on one page — use it on a page in the Workspace view.'
+      'Temco Knowledge: this acts on one page — pick one in the Workspace view first.'
     );
     return undefined;
   }
-  const found = findPage(deps.roots(), node.page.id);
+  const found = findPage(deps.roots(), row.page.id);
   if (!found) {
     return undefined;
   }
@@ -585,6 +636,22 @@ function requirePage(
     return undefined;
   }
   return found;
+}
+
+/**
+ * Whether a source can be written into at all.
+ *
+ * A source read over the API is a record of what was read, not a folder: its uri has no file system behind it,
+ * so a page there has to be created in the repository itself rather than appear to succeed and then fail.
+ */
+function writable(root: DocsRoot): boolean {
+  if (root.origin !== 'catalog') {
+    return true;
+  }
+  void vscode.window.showInformationMessage(
+    `Temco Knowledge: ${root.folder.name} was read from a source rather than found on this machine, so there is no folder here to write a page into.`
+  );
+  return false;
 }
 
 function findPage(roots: readonly DocsRoot[], id: string): { root: DocsRoot; page: PageEntry } | undefined {

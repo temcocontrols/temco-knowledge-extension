@@ -155,6 +155,41 @@
   (`temcoKnowledge.openAiPanel`) is a labelled entry in the Library's **More (⋯)** menu — a view-level action in
   the view's own menu — and it is on the context menu of **The AI** row, beside the rest of that row's actions.
   An item's menu carries that item's actions; a view's menu carries the view's.
+- **The Workspace tree is the Explorer's shape now.** A **left click** opens a page or expands a folder, and a
+  **right click** — or the keyboard's ContextMenu key — opens the row's own menu, with the item list an Explorer
+  row has: *New Page… · New Chapter… · New Page of a Kind ▸ · Reveal in Explorer · Open in Integrated Terminal ·
+  Copy Path · Copy Relative Path · Rename the Title… · Move the Page Up · Move the Page Down · Retire… · Open the
+  Registry*, each one only where it means something (a page gets no *New Page…*; a chapter gets no *Rename*). The
+  view's title bar keeps **New page · New chapter · Refresh** and a `…` that shows the same list for the row the
+  tree last had focused, so a person who never right-clicks still has the whole menu one click away. **A row's
+  hover carries nothing** — the two icons it had are gone, because the menu is what the row's actions belong to.
+- **The files a row's menu can start are the page *kinds*.** A page is always Markdown — its id is its path under
+  `docs/`, the generator reads its title from its first `#`, and the site renders nothing else — so the *txt ·
+  excel* of a file manager have no counterpart here; what does is the kind that decides the headings a page starts
+  with (Article · Task · Reference · Troubleshooting · Release note). The five are one command each, because a
+  menu entry cannot carry an argument, and they are the submenu the toolbar and the row menu both show.
+- **Reveal is the operating system's, not VS Code's.** `revealFileInOS` opens Windows Explorer, Finder or the
+  Linux file manager at the row's file or folder; `revealInExplorer` — the VS Code view of that name — knows
+  nothing about a folder in `docs/` and was the wrong one to call for a chapter, an area or a source.
+- **`src/rowOps.ts` is new**: where a row is rather than what it writes — reveal · terminal · copy a path. A row's
+  folder is derived from the platform's own path rule (`docs/<area>[/<chapter>]`, and the chapter that *is* the
+  area folder), declared once in `registry.ts` as `ROOT_CHAPTER` and `contentUri`, so creating a page and pointing
+  at one agree about where the files are.
+- **A source read over the API is refused a page write.** Its uri has no file system behind it (`temco-source`),
+  so a page there would appear to be created and then fail. `newPage` and `newChapter` now say what the problem
+  is instead of reaching for the file system, and reveal · terminal · copy say it too.
+- **The Workspace view's toolbar.** *New page* · *New chapter* · *Refresh* inline, and the rest in its `…`: the
+  page acts, the kind submenu, the registry, Home and Validate. It is the Library's shape, and a `…` in a title
+  bar opens **where it is** — which a list started from a row can never do.
+- **`Create the Missing Page File` did nothing when it came from a row.** It was written for a caller that names
+  a path; a tree row hands it the page instead, so it was a silent no-op. It now understands either, which is
+  what makes *Create the file…* work from a row's `…` menu.
+- **The tree looks like a documentation set.** An area is a `folder`, a repository is a `folder-opened`, a
+  chapter stays `files`, and a page is a `markdown` document — because every page *is* one (`docs/<page id>.md`).
+  State is said in colour rather than by swapping the icon, so a row never stops looking like the page it stands
+  for: a fault is red, something to look at is amber. Two states keep a shape of their own, because the shape is
+  the message — a declared page with no file (`new-file`, red) and the generator's stale verdict (`history`,
+  dimmed).
 - **Needs attention reads at a glance.** The Library's first row carries a colour now, because it is the row a
   person looks at before anything else: **red** when the count includes a fault (`problemsErrorIcon.foreground`),
   **amber** when it is only warnings, stale pages, unowned pages or a declared-but-absent file, and a **green

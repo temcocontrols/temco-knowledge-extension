@@ -87,13 +87,28 @@
       },
       {
         "command": "temcoKnowledge.openPage",
-        "title": "Open Page",
+        "title": "Open the Page",
         "icon": "$(go-to-file)"
       },
       {
-        "command": "temcoKnowledge.revealPage",
+        "command": "temcoKnowledge.reveal",
         "title": "Reveal in Explorer",
         "icon": "$(folder-opened)"
+      },
+      {
+        "command": "temcoKnowledge.openTerminal",
+        "title": "Open in Integrated Terminal",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "temcoKnowledge.copyPath",
+        "title": "Copy Path",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "temcoKnowledge.copyRelativePath",
+        "title": "Copy Relative Path",
+        "icon": "$(copy)"
       },
       {
         "command": "temcoKnowledge.models",
@@ -196,7 +211,8 @@
       },
       {
         "command": "temcoKnowledge.createPage",
-        "title": "Create the Missing Page File"
+        "title": "Create the Missing Page File",
+        "icon": "$(new-file)"
       },
       {
         "command": "temcoKnowledge.openProjects",
@@ -323,33 +339,63 @@
       },
       {
         "command": "temcoKnowledge.newPage",
-        "title": "New Page"
+        "title": "New Page",
+        "icon": "$(new-file)"
       },
       {
         "command": "temcoKnowledge.newChapter",
-        "title": "New Chapter"
+        "title": "New Chapter",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "temcoKnowledge.newPage.article",
+        "title": "New Article Page"
+      },
+      {
+        "command": "temcoKnowledge.newPage.task",
+        "title": "New Task Page"
+      },
+      {
+        "command": "temcoKnowledge.newPage.reference",
+        "title": "New Reference Page"
+      },
+      {
+        "command": "temcoKnowledge.newPage.troubleshooting",
+        "title": "New Troubleshooting Page"
+      },
+      {
+        "command": "temcoKnowledge.newPage.releaseNote",
+        "title": "New Release Note Page"
       },
       {
         "command": "temcoKnowledge.renamePage",
-        "title": "Rename the Page Title"
+        "title": "Rename the Page Title",
+        "icon": "$(edit)"
       },
       {
         "command": "temcoKnowledge.movePageUp",
-        "title": "Move the Page Up"
+        "title": "Move the Page Up",
+        "icon": "$(arrow-up)"
       },
       {
         "command": "temcoKnowledge.movePageDown",
-        "title": "Move the Page Down"
+        "title": "Move the Page Down",
+        "icon": "$(arrow-down)"
       },
       {
         "command": "temcoKnowledge.retirePage",
-        "title": "Retire the Page"
+        "title": "Retire the Page",
+        "icon": "$(archive)"
       }
     ],
     "submenus": [
       {
         "id": "temcoKnowledge.markdown",
         "label": "Temco Knowledge"
+      },
+      {
+        "id": "temcoKnowledge.pageKinds",
+        "label": "New Page of a Kind"
       }
     ],
     "menus": {
@@ -455,14 +501,36 @@
           "group": "4_navigate@1"
         }
       ],
+      "temcoKnowledge.pageKinds": [
+        {
+          "command": "temcoKnowledge.newPage.article",
+          "group": "1_kind@1"
+        },
+        {
+          "command": "temcoKnowledge.newPage.task",
+          "group": "1_kind@2"
+        },
+        {
+          "command": "temcoKnowledge.newPage.reference",
+          "group": "1_kind@3"
+        },
+        {
+          "command": "temcoKnowledge.newPage.troubleshooting",
+          "group": "1_kind@4"
+        },
+        {
+          "command": "temcoKnowledge.newPage.releaseNote",
+          "group": "1_kind@5"
+        }
+      ],
       "view/title": [
         {
-          "command": "temcoKnowledge.home",
+          "command": "temcoKnowledge.newPage",
           "when": "view == temcoKnowledge.pages",
           "group": "navigation@0"
         },
         {
-          "command": "temcoKnowledge.validate",
+          "command": "temcoKnowledge.newChapter",
           "when": "view == temcoKnowledge.pages",
           "group": "navigation@1"
         },
@@ -470,6 +538,76 @@
           "command": "temcoKnowledge.refresh",
           "when": "view == temcoKnowledge.pages",
           "group": "navigation@2"
+        },
+        {
+          "command": "temcoKnowledge.openPage",
+          "when": "view == temcoKnowledge.pages",
+          "group": "1_open@1"
+        },
+        {
+          "submenu": "temcoKnowledge.pageKinds",
+          "when": "view == temcoKnowledge.pages",
+          "group": "2_kind@1"
+        },
+        {
+          "command": "temcoKnowledge.createPage",
+          "when": "view == temcoKnowledge.pages",
+          "group": "2_missing@1"
+        },
+        {
+          "command": "temcoKnowledge.reveal",
+          "when": "view == temcoKnowledge.pages",
+          "group": "2_show@1"
+        },
+        {
+          "command": "temcoKnowledge.openTerminal",
+          "when": "view == temcoKnowledge.pages",
+          "group": "2_show@2"
+        },
+        {
+          "command": "temcoKnowledge.copyPath",
+          "when": "view == temcoKnowledge.pages",
+          "group": "2_show@3"
+        },
+        {
+          "command": "temcoKnowledge.copyRelativePath",
+          "when": "view == temcoKnowledge.pages",
+          "group": "2_show@4"
+        },
+        {
+          "command": "temcoKnowledge.renamePage",
+          "when": "view == temcoKnowledge.pages",
+          "group": "3_edit@1"
+        },
+        {
+          "command": "temcoKnowledge.movePageUp",
+          "when": "view == temcoKnowledge.pages",
+          "group": "3_edit@2"
+        },
+        {
+          "command": "temcoKnowledge.movePageDown",
+          "when": "view == temcoKnowledge.pages",
+          "group": "3_edit@3"
+        },
+        {
+          "command": "temcoKnowledge.retirePage",
+          "when": "view == temcoKnowledge.pages",
+          "group": "4_retire@1"
+        },
+        {
+          "command": "temcoKnowledge.home",
+          "when": "view == temcoKnowledge.pages",
+          "group": "5_view@1"
+        },
+        {
+          "command": "temcoKnowledge.validate",
+          "when": "view == temcoKnowledge.pages",
+          "group": "5_view@2"
+        },
+        {
+          "command": "temcoKnowledge.openRegistry",
+          "when": "view == temcoKnowledge.pages",
+          "group": "9_registry@1"
         },
         {
           "command": "temcoKnowledge.newProject",
@@ -544,33 +682,49 @@
       ],
       "view/item/context": [
         {
-          "command": "temcoKnowledge.openPage",
-          "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
-          "group": "inline"
-        },
-        {
-          "command": "temcoKnowledge.revealPage",
-          "when": "view == temcoKnowledge.pages && viewItem == page",
-          "group": "1_open@1"
-        },
-        {
           "command": "temcoKnowledge.createPage",
           "when": "view == temcoKnowledge.pages && viewItem == missingPage",
-          "group": "1_open@0"
+          "group": "0_missing@1"
         },
         {
-          "command": "temcoKnowledge.openRegistry",
-          "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|chapter|folder)$/",
-          "group": "1_open@2"        },
-        {
           "command": "temcoKnowledge.newPage",
-          "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|chapter|folder)$/",
-          "group": "2_new@1"
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter)$/",
+          "group": "1_new@1"
         },
         {
           "command": "temcoKnowledge.newChapter",
-          "when": "view == temcoKnowledge.pages && viewItem =~ /^(area|folder)$/",
-          "group": "2_new@2"
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter)$/",
+          "group": "1_new@2"
+        },
+        {
+          "submenu": "temcoKnowledge.pageKinds",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter)$/",
+          "group": "1_new@3"
+        },
+        {
+          "command": "temcoKnowledge.openPage",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "temcoKnowledge.reveal",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter|page|missingPage)$/",
+          "group": "2_show@1"
+        },
+        {
+          "command": "temcoKnowledge.openTerminal",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter|page|missingPage)$/",
+          "group": "2_show@2"
+        },
+        {
+          "command": "temcoKnowledge.copyPath",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter|page|missingPage)$/",
+          "group": "2_show@3"
+        },
+        {
+          "command": "temcoKnowledge.copyRelativePath",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter|page|missingPage)$/",
+          "group": "2_show@4"
         },
         {
           "command": "temcoKnowledge.renamePage",
@@ -590,7 +744,12 @@
         {
           "command": "temcoKnowledge.retirePage",
           "when": "view == temcoKnowledge.pages && viewItem =~ /^(page|missingPage)$/",
-          "group": "9_retire@1"
+          "group": "4_retire@1"
+        },
+        {
+          "command": "temcoKnowledge.openRegistry",
+          "when": "view == temcoKnowledge.pages && viewItem =~ /^(folder|area|chapter|page|missingPage)$/",
+          "group": "9_registry@1"
         },
         {
           "command": "temcoKnowledge.openProject",

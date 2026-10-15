@@ -190,7 +190,7 @@ function folderItem(node: FolderNode): vscode.TreeItem {
           (stale > 0 ? ` · ${stale} stale` : ''),
     ].join('\n')
   );
-  item.iconPath = new vscode.ThemeIcon(recorded ? 'cloud' : 'library');
+  item.iconPath = new vscode.ThemeIcon(recorded ? 'cloud' : 'folder-opened');
   item.contextValue = recorded ? 'source' : 'folder';
   return item;
 }
@@ -223,7 +223,7 @@ function areaItem(node: AreaNode): vscode.TreeItem {
         .join(' · '),
     ].join('\n')
   );
-  item.iconPath = new vscode.ThemeIcon('book');
+  item.iconPath = new vscode.ThemeIcon('folder');
   item.contextValue = 'area';
   return item;
 }
@@ -286,13 +286,21 @@ function pageItem(node: PageNode): vscode.TreeItem {
         : page.issues.map((issue) => `- ${issue.severity === 'error' ? '$(error)' : '$(warning)'} ${issue.message}`).join('\n'),
     ].join('\n')
   );
+  // A page looks like what it is — a Markdown document, because every page is one — and its state is said in
+  // colour rather than by swapping the icon, so no row stops looking like the page it stands for. Two states do
+  // get their own shape, because the shape *is* the message: a declared page with no file, and the generator's
+  // stale verdict.
+  const colour = !page.exists ? 'problemsErrorIcon.foreground'
+    : page.issues.some((issue) => issue.severity === 'error') ? 'problemsErrorIcon.foreground'
+      : page.issues.length > 0 ? 'problemsWarningIcon.foreground'
+        : undefined;
   item.iconPath = !page.exists
-    ? new vscode.ThemeIcon('question', new vscode.ThemeColor('problemsErrorIcon.foreground'))
-    : page.issues.length > 0
-      ? new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground'))
-      : stale
-        ? new vscode.ThemeIcon('history', new vscode.ThemeColor('descriptionForeground'))
-        : new vscode.ThemeIcon('file');
+    ? new vscode.ThemeIcon('new-file', new vscode.ThemeColor('problemsErrorIcon.foreground'))
+    : stale
+      ? new vscode.ThemeIcon('history', new vscode.ThemeColor('descriptionForeground'))
+      : colour !== undefined
+        ? new vscode.ThemeIcon('markdown', new vscode.ThemeColor(colour))
+        : new vscode.ThemeIcon('markdown');
   item.contextValue = page.exists ? 'page' : 'missingPage';
   item.command = {
     command: 'temcoKnowledge.openPage',

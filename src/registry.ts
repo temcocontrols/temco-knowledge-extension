@@ -12,6 +12,15 @@ export const REGISTRY_RELATIVE_PATH = ['docs', 'help', 'registry.json'];
 /** Folder that holds the pages themselves, relative to the repository root. */
 const CONTENT_RELATIVE_PATH = ['docs'];
 
+/**
+ * The chapter that is the area folder itself.
+ *
+ * A page whose id has two segments — `t3000/index` — sits directly in `docs/t3000`, and the registry spells its
+ * chapter `(root)`. That is the generator's own spelling, not a choice made here; it is named once so that
+ * creating a page and pointing at one agree about where the files are.
+ */
+export const ROOT_CHAPTER = '(root)';
+
 /** The generated neighbours the product repo's generator writes beside the registry. */
 const INDEX_RELATIVE_PATH = ['docs', 'help', 'index.json'];
 const PAGE_META_RELATIVE_PATH = ['docs', 'help', 'page-meta.json'];
@@ -157,7 +166,12 @@ export async function fileExists(uri: vscode.Uri): Promise<boolean> {
 export function pageUri(rootUri: vscode.Uri, id: string): vscode.Uri {
   const segments = id.split('/');
   const file = segments.pop() ?? id;
-  return vscode.Uri.joinPath(rootUri, ...CONTENT_RELATIVE_PATH, ...segments, `${file}.md`);
+  return vscode.Uri.joinPath(contentUri(rootUri, ...segments), `${file}.md`);
+}
+
+/** A folder under a repository's `docs/` — the one path rule the platform owns, named in one place. */
+export function contentUri(rootUri: vscode.Uri, ...path: string[]): vscode.Uri {
+  return vscode.Uri.joinPath(rootUri, ...CONTENT_RELATIVE_PATH, ...path);
 }
 
 export function registryUriFor(folder: vscode.WorkspaceFolder): vscode.Uri {

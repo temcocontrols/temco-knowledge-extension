@@ -452,7 +452,7 @@ nobody had picked — and the tree could only be read. What replaced it is one r
 ```
 
 The Workspace tree now carries the page operations, because that is where a page is. `page` and `missingPage` are
-two context values rather than one, so a menu can offer *Create the missing page file* only where a file is
+two context values rather than one, so the menu can offer *Create the missing page file* only where a file is
 missing, and *Move* only where there is one.
 
 ```
@@ -463,11 +463,30 @@ missing, and *Move* only where there is one.
        System Time    ⚠ missing file
        Trend Log      (read from the source)
 
-   right-click a chapter   New page here… · Open the registry · Reveal the folder
-   right-click a page      Open · Reveal in Explorer · Rename the title…
-                           Move up · Move down · Retire…
+   left click a row        a page opens · a folder expands          (the Explorer's own behaviour)
+   right click a row       the row's menu — and the keyboard's menu key opens the same one
+   on a folder row         New Page… · New Chapter… · New Page of a Kind ▸ · Reveal in Explorer
+                           Open in Integrated Terminal · Copy Path · Copy Relative Path
+                           Open the Registry
+   on a page row           Open the Page · Reveal in Explorer · Open in Integrated Terminal
+                           Copy Path · Copy Relative Path · Rename the Title…
+                           Move the Page Up · Move the Page Down · Retire… · Open the Registry
+   the view's toolbar      [New page] [New chapter] [Refresh] [⋯]  — the ⋯ is the list above, for the
+                           row the tree last had focused
    drag a page onto        a chapter (chapter + order) · a sibling (two order values, swapped)
 ```
+
+**The tree behaves the way the Explorer does, because that is the tree everyone already knows.** A left click opens
+a page or expands a folder; a right click opens the row's own menu, which carries only what that row can do — a
+page has no *New Page…*, a chapter has no *Rename*. Nothing is on hover, because a menu started from a row can only
+ever be a quick pick in the middle of the top of the window, and the menu above is what replaces it. The one act
+that is *not* the Explorer's is deliberate: **the view's `…` shows the same list for the row the tree last had
+focused**, so the buttons in the title bar and the palette reach every act without a right click (a view title
+action runs with the tree pane's context, and the row commands fall back to the view's selection).
+
+**The kinds are the file types.** A page is always Markdown — its id is its path under `docs/`, the generator reads
+its title from its first `#` — so the submenu lists what actually differs between one new page and another: the
+headings it starts with (Article · Task · Reference · Troubleshooting · Release note).
 
 **A drag is a registry write, and it says which values it will change.** Dropping a page on a chapter writes its
 `chapter` and a new `order`, and the confirmation says the word *structure*, because `15-online-editor.md` §5.4

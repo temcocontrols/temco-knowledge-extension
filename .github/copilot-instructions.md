@@ -77,6 +77,7 @@ src/scaffold.ts      starts a registry in an open folder that has none (smallest
 src/feedback.ts      feedback rows routed to their owner, against a proposed file shape
 src/format.ts        the Markdown toolbar: formatting, blocks, a link to a real page, the outline
 src/pageOps.ts       operating on a page: create · rename the title · move · retire · the drag controller
+src/rowOps.ts        where a row is rather than what it writes: reveal in the OS · a terminal · copy a path
 src/registryEdit.ts  writing one named value of registry.json, in its own generator's shape
 src/selected.ts      which project is being worked on, and which page of it (workspaceState)
 src/surface.ts       the one-tab-group rule — ViewColumn is named only here
@@ -102,11 +103,21 @@ registered once**: a second `registerCommand` for the same id throws in the midd
 below it silently never runs, so `npm run compile` also runs `scripts/check-commands.mjs`. The Workspace view is
 about the project being worked on and never about the open folders, and it says why it is empty in **rows it
 draws itself** (`TreeNote` in `src/tree.ts`), not in a `viewsWelcome`.
-**Menus follow what they belong to** (the user's rule, 2026-10-15): a view-level action goes in the view's
-**More (⋯)** menu or its icon row (`view/title`), an item-level action on that item's own context menu
-(`view/item/context`, with a `viewItem` clause). Do not put an item's action on every row, and do not put a
-view-level one on a row. The Markdown toolbar lives in the
-editor's own menus (`editor/title`, `editor/context`) rather than in a page of its own:
+**Menus follow what they belong to** (the user's rule, 2026-10-15, settled over four passes): a view-level action
+goes in the view's **More (⋯)** menu or its icon row (`view/title`); an item's actions go on that item — in the
+**Library** and in the **Workspace tree** as a per-item context menu (`view/item/context` with a `viewItem`
+clause). The Workspace tree is **the Explorer's shape**, which is what the user asked for in the end: a left click
+opens a page or expands a folder, a right click (or the keyboard's menu key — the only two triggers VS Code has)
+opens the row's menu, and **nothing is on hover**, because a menu started from a row can only ever be a QuickPick
+in the middle of the top of the window. Its toolbar carries *New page* · *New chapter* · *Refresh* with the same
+list in its `…` **for the row the tree last had focused**, so the menu is reachable without a right click: a view
+title action is run with the tree pane's context, so the command receives that row (`getActionsContext` in the
+fork's `treeView.ts` returns `{ $treeViewId, $focusedTreeItem: true, $selectedTreeItems: true }`;
+`extHostTreeViews.ts` converts it to the element), and `targeted()` in `src/pageOps.ts` / `src/rowOps.ts` falls
+back to `treeView.selection[0]` for the palette. A file manager's *New File* list has no counterpart here — a page
+is always `.md`, so the submenu lists the page **kinds**. Do not add an item's action to every row, do not add a
+view-level action to a row, and do not offer to rename or delete a page's *file*. The Markdown toolbar lives in
+the editor's own menus (`editor/title`, `editor/context`) rather than in a page of its own:
 `docs/editor-design.md` says why.
 
 ## Conventions

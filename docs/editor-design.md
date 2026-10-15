@@ -107,7 +107,9 @@ someone has to delete. Every one starts with `# <title>`, which is what the gene
 
 ```
   New page ─────────────────────────────────────────────────────────────────────
-  1  Where    the chapter you right-clicked (or: which source ▸ which area ▸ which chapter)
+  1  Where    the row it was started from — a page's own area and chapter, a chapter itself,
+              an area's root chapter — or the row you have selected, or:
+              which source ▸ which area ▸ which chapter
   2  Kind     article · task · reference · troubleshooting · release note
   3  Title    Trend Logs
   4  File     trend-logs          →  docs/t3000/features/trend-logs.md        (shown, not guessed)
@@ -116,6 +118,10 @@ someone has to delete. Every one starts with `# <title>`, which is what the gene
   ── then ──
   “It becomes a page when the registry names it.”          [ Run the generator ]
 ```
+
+A repository row cannot answer step 1 — it is not in an area — so it answers the source and the rest is still
+asked. Nothing else is asked when the kind came from the *New Page of a Kind* submenu: step 2 is the entry that
+was clicked, and steps 3 and 4 follow as they always do.
 
 **New chapter** is the same flow with the folder named first, because a chapter is a page's *path*: a folder
 with nothing in it is not a chapter, not in the registry, and not in the table of contents. The folder arrives
@@ -172,6 +178,17 @@ was asked in:
 | The Library's title bar holds twelve buttons | **three inline, the rest in the view's `⋯`** | `newProject` · `openProjects` · `openNeeds` stay in group `navigation`; everything else moved to named groups, which is how a `view/title` item lands in the overflow menu. **The header starts work; a row and a page operate on a thing** — and the target-less ones ask which, which they already did |
 | Which operations the Workspace tree grows | **all five**: new page · new chapter · rename the title · move (up, down, and by dragging) · retire | `src/pageOps.ts` — six commands, a `TreeDragAndDropController`, and one modal per write |
 | How far into `registry.json` | **one named value, on a confirmation** | `src/registryEdit.ts` — `title`, `order`, `chapter`, `deprecated`, `superseded_by`, and nothing else; never a whole-file rewrite |
+
+Where a row offers its operations was settled on the third attempt: **the row menu is the Explorer's, the toolbar
+mirrors it, and the hover carries nothing.** A **left click** does what it does in the Explorer — opens a page,
+expands a folder — and a **right click** (or the keyboard's menu key) opens *New Page… · New Chapter… · New Page
+of a Kind ▸ · Reveal in Explorer · Open in Integrated Terminal · Copy Path · Copy Relative Path · Rename the
+Title… · Move the Page Up · Move the Page Down · Retire… · Open the Registry*, each item only where it means
+something. The view's `…` shows the same list — plus *New page*, *New chapter*, *Refresh*, Home and Validate —
+acting on the row the tree last had focused, which is also what makes it usable from the palette: **a view title
+action is run with the tree pane's context**, and every row command falls back to the view's own selection. There
+are no hover icons on a row: a menu started from a row can only ever be a quick pick in the middle of the top of
+the window, and that is exactly what the row menu above replaces.
 
 ### What each operation writes
 
