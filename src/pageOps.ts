@@ -33,16 +33,15 @@ import { KnowledgeNode } from './tree';
 /** The MIME a dragged page carries. One kind of thing can be dragged into a chapter: a page. */
 const PAGE_MIME = 'application/vnd.code.tree.temcoKnowledge.page';
 
-const EMPTY_CHAPTER_HINT = 'A chapter exists as soon as it has a page: this creates the folder and the page.';
-
-interface Kind {
+export interface Kind {
   label: string;
   detail: string;
   /** The headings a page of this kind starts with — and nothing else. An invented sentence is a sentence to delete. */
   headings: string[];
 }
 
-const KINDS: Kind[] = [
+/** The kinds, in the order a page offers them. Exported so the New page page shows this list and no other. */
+export const KINDS: Kind[] = [
   { label: 'Article', detail: 'what it is · how it is set up · what to read next', headings: ['Overview', 'Configuration', 'Related pages'] },
   { label: 'Task', detail: 'a job a reader has to finish', headings: ['Before you start', 'Steps', 'If it does not work'] },
   { label: 'Reference', detail: 'fields, registers, commands — tables', headings: ['Fields', 'Notes'] },
@@ -50,6 +49,8 @@ const KINDS: Kind[] = [
   { label: 'Release note', detail: 'what changed in a build', headings: ['What is new', 'Fixed', 'Known issues'] },
 ];
 
+/** The chapter that is the area folder itself — what a page directly in an area belongs to. */
+export const AREA_CHAPTER = ROOT_CHAPTER;
 export interface PageDeps {
   roots: () => readonly DocsRoot[];
   output: vscode.OutputChannel;
@@ -63,6 +64,34 @@ export interface PageDeps {
    * tree view itself.
    */
   selected: () => KnowledgeNode | undefined;
+  /**
+   * Open the page that creates a page.
+   *
+   * Creating one needs a name, and a name is not asked for in a tree: the page shows every field at once, can
+   * draft the body, and writes only what a person has read. A callback rather than an import, so that this
+   * module and the page do not depend on each other.
+   */
+  newPagePage: (seed: NewPageSeed) => void;
+}
+
+/** Where a new page is going, in the names the form shows: the source, the area, the chapter and the kind. */
+export interface NewPageSeed {
+  /** A source's folder name, as the tree shows it. */
+  source?: string;
+  area?: string;
+  chapter?: string;
+  kind?: string;
+  /** True when the act was *New chapter*: the page opens ready to make a folder and its first page. */
+  chapterMode?: boolean;
+}
+
+/** One page to write, complete. */
+export interface NewPageSpec extends NewPageSeed {
+  title: string;
+  /** The file name without `.md`. Empty or invalid means "derive it from the title", which is what a form posts. */
+  slug?: string;
+  /** What to write under the title — a draft the person read. Nothing means the kind's headings alone. */
+  body?: string;
 }
 
 interface Place {
@@ -132,25 +161,30 @@ export class PageOperations implements vscode.TreeDragAndDropController<Knowledg
 
 export function registerPageCommands(context: vscode.ExtensionContext, deps: PageDeps): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('temcoKnowledge.newPage', (node?: KnowledgeNode) => newPage(deps, node)),
-    vscode.commands.registerCommand('temcoKnowledge.newChapter', (node?: KnowledgeNode) => newChapter(deps, node)),
+    vscode.commands.registerCommand('temcoKnowledge.newPage', (node?: KnowledgeNode) =>
+      startNewPage(deps, node, {})
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.newChapter', (node?: KnowledgeNode) =>
+      startNewPage(deps, node, { chapterMode: true })
+    ),
     // The kinds, one command each. A menu entry cannot carry an argument, so the submenu in `package.json` is the
     // list of kinds and each entry names the command that already knows its own. They are written out rather than
-    // built in a loop so that `scripts/check-commands.mjs` sees every id like it sees the others.
+    // built in a loop so that `scripts/check-commands.mjs` sees every id like it sees the others. Each one opens
+    // the same page with its kind already chosen.
     vscode.commands.registerCommand('temcoKnowledge.newPage.article', (node?: KnowledgeNode) =>
-      newPageOfKind(deps, node, 'Article')
+      startNewPage(deps, node, { kind: 'Article' })
     ),
     vscode.commands.registerCommand('temcoKnowledge.newPage.task', (node?: KnowledgeNode) =>
-      newPageOfKind(deps, node, 'Task')
+      startNewPage(deps, node, { kind: 'Task' })
     ),
     vscode.commands.registerCommand('temcoKnowledge.newPage.reference', (node?: KnowledgeNode) =>
-      newPageOfKind(deps, node, 'Reference')
+      startNewPage(deps, node, { kind: 'Reference' })
     ),
     vscode.commands.registerCommand('temcoKnowledge.newPage.troubleshooting', (node?: KnowledgeNode) =>
-      newPageOfKind(deps, node, 'Troubleshooting')
+      startNewPage(deps, node, { kind: 'Troubleshooting' })
     ),
     vscode.commands.registerCommand('temcoKnowledge.newPage.releaseNote', (node?: KnowledgeNode) =>
-      newPageOfKind(deps, node, 'Release note')
+      startNewPage(deps, node, { kind: 'Release note' })
     ),
     vscode.commands.registerCommand('temcoKnowledge.renamePage', (node?: KnowledgeNode) => renamePage(deps, node)),
     vscode.commands.registerCommand('temcoKnowledge.movePageUp', (node?: KnowledgeNode) => movePage(deps, node, -1)),
@@ -173,137 +207,102 @@ function targeted(deps: PageDeps, node?: KnowledgeNode): KnowledgeNode | undefin
 
 // ------------------------------------------------------------------ creating
 
-async function newPage(deps: PageDeps, node?: KnowledgeNode): Promise<void> {
-  const place = await choosePlace(deps, node);
-  if (place) {
-    await createPage(deps, place);
-  }
+/**
+ * *New page…*, *New chapter…* and the kind entries all end here: they open the page that creates one.
+ *
+ * Nothing asks for a name in the tree. A name is typed in a form that can show the file it will produce, offer
+ * the kinds side by side, and draft the body from material a person chose — and the tree has room for none of
+ * that. What the tree *does* contribute is where the page is going: the row that was clicked, or the row the
+ * view has selected.
+ */
+function startNewPage(deps: PageDeps, node: KnowledgeNode | undefined, seed: NewPageSeed): void {
+  deps.newPagePage({ ...whereOf(targeted(deps, node)), ...seed });
 }
 
-/** A new page of one kind, from the menu that lists the kinds: the kind is the entry that was clicked. */
-async function newPageOfKind(deps: PageDeps, node: KnowledgeNode | undefined, label: string): Promise<void> {
-  const kind = KINDS.find((candidate) => candidate.label === label);
-  const place = await choosePlace(deps, node);
-  if (kind !== undefined && place !== undefined) {
-    await createPage(deps, place, kind);
+/** Where a row sits, in the names the form shows. A row that stands for no place contributes nothing. */
+function whereOf(row: KnowledgeNode | undefined): NewPageSeed {
+  switch (row?.kind) {
+    case 'page':
+      return { source: row.root.folder.name, area: row.page.area, chapter: row.page.chapter };
+    case 'chapter':
+      return { source: row.root.folder.name, area: row.area.area, chapter: row.chapter.chapter };
+    case 'area':
+      return { source: row.root.folder.name, area: row.area.area };
+    case 'folder':
+      return { source: row.root.folder.name };
+    default:
+      return {};
   }
 }
 
 /**
- * A new chapter.
+ * The one write that makes a page: a file at `docs/<area>/[<chapter>/]<name>.md`.
  *
- * There is no such thing as an empty chapter: the generator derives `chapter` from a page's *path*, so a folder
- * with nothing in it does not appear in the registry, in the tree, or in the table of contents. So this asks for
- * the name and then creates the first page in it — the folder arrives with it.
+ * Called by the New page page, with everything the person filled in and read. The confirmation names the file
+ * and says which parts of it the generator will derive, so a write never happens without saying what it is —
+ * and a file that is already there is reported rather than overwritten.
+ *
+ * The body is written as given: it is a draft the person has already seen, or nothing, in which case the kind's
+ * headings alone are written. Either way the first line is `# <title>`, because that is where the repository's
+ * generator takes a new page's title from.
  */
-async function newChapter(deps: PageDeps, node?: KnowledgeNode): Promise<void> {
-  const row = targeted(deps, node);
-  const from = row ? areaOf(row) : undefined;
-  const root = from?.root ?? (row?.kind === 'folder' ? row.root : await chooseRoot(deps.roots()));
-  if (!root || !writable(root)) {
-    return;
-  }
-  const area = from?.area ?? (await chooseArea(root));
-  if (!area) {
-    return;
-  }
-  const name = await vscode.window.showInputBox({
-    title: 'The chapter',
-    prompt: EMPTY_CHAPTER_HINT,
-    placeHolder: 'trend-logs',
-    validateInput: (value) => (validSlug(value) ? undefined : 'Letters, digits and hyphens — it becomes a folder name.'),
-  });
-  if (name === undefined) {
-    return;
-  }
-  await createPage(deps, { root, area, chapter: name });
-}
-
-/** The chapter and area a new page belongs in: the node that was right-clicked, or a question. */
-async function choosePlace(deps: PageDeps, node?: KnowledgeNode): Promise<Place | undefined> {
-  const row = targeted(deps, node);
-  const from = row ? placeOf(row) : undefined;
-  if (from) {
-    return writable(from.root) ? from : undefined;
-  }
-  // A repository row is not in an area, so it answers the first question and the rest is still asked.
-  const root = row?.kind === 'folder' ? row.root : await chooseRoot(deps.roots());
-  if (!root || !writable(root)) {
+export async function writePage(deps: PageDeps, spec: NewPageSpec): Promise<{ relative: string } | undefined> {
+  const root =
+    deps.roots().find((candidate) => candidate.folder.name === spec.source) ??
+    (deps.roots().length === 1 ? deps.roots()[0] : undefined);
+  if (root === undefined) {
+    void vscode.window.showInformationMessage(
+      'Temco Knowledge: no source on this machine is being read, so there is nothing to create a page in. ' +
+        'A source read over the API has no working tree.'
+    );
     return undefined;
   }
-  const area = await chooseArea(root);
-  if (!area) {
+  if (!writable(root)) {
     return undefined;
   }
-  const group = root.areas.find((candidate) => candidate.area === area);
-  const chapters = (group?.chapters ?? []).map((chapter) => chapter.chapter);
-  const chapter = await vscode.window.showQuickPick(
-    [
-      { label: ROOT_CHAPTER, description: `directly in ${area}`, chapter: ROOT_CHAPTER },
-      ...chapters.map((name) => ({ label: name, description: '', chapter: name })),
-    ],
-    { title: 'Which chapter?', placeHolder: ROOT_CHAPTER + ' means the file sits beside the chapter folders' }
-  );
-  return chapter ? { root, area, chapter: chapter.chapter } : undefined;
-}
 
-/** The kind, the title and the file name — then the one write, which the confirmation names first. */
-async function createPage(deps: PageDeps, place: Place, chosen?: Kind): Promise<void> {
-  const { root, area, chapter } = place;
-  const kind =
-    chosen ??
-    (await vscode.window.showQuickPick(KINDS, {
-      title: 'What kind of page is it?',
-      placeHolder: 'The kind decides the headings it starts with, and nothing else',
-    }));
-  if (!kind) {
-    return;
+  const title = spec.title.trim();
+  if (title.length === 0) {
+    void vscode.window.showWarningMessage('Temco Knowledge: a page needs a title.');
+    return undefined;
   }
-
-  const title = await vscode.window.showInputBox({
-    title: 'The page title',
-    prompt: 'It becomes the page’s first `#` heading, and through it the title the registry records.',
-    placeHolder: 'Trend Logs',
-    validateInput: (value) => (value.trim().length > 0 ? undefined : 'A page needs a title.'),
-  });
-  if (title === undefined) {
-    return;
+  const area = spec.area ?? root.areas[0]?.area;
+  if (area === undefined || area.length === 0) {
+    void vscode.window.showWarningMessage('Temco Knowledge: a page belongs in an area, and this source has none.');
+    return undefined;
   }
-
-  const slug = await vscode.window.showInputBox({
-    title: 'The file name',
-    value: slugify(title),
-    prompt: `docs/${area}/${chapter === ROOT_CHAPTER ? '' : `${chapter}/`}<name>.md — the page id is this path.`,
-    validateInput: (value) => (validSlug(value) ? undefined : 'Letters, digits and hyphens only.'),
-  });
-  if (slug === undefined) {
-    return;
-  }
+  const chapter = spec.chapter ?? ROOT_CHAPTER;
+  const slug = spec.slug !== undefined && validSlug(spec.slug) ? spec.slug : slugify(title);
+  const kind = KINDS.find((candidate) => candidate.label === spec.kind) ?? KINDS[0];
 
   const uri = pageUri(root, area, chapter, slug);
   const relative = vscode.workspace.asRelativePath(uri);
   if (await exists(uri)) {
     void vscode.window.showWarningMessage(`Temco Knowledge: there is already a file at ${relative}. Nothing was written.`);
-    return;
+    return undefined;
   }
 
+  const drafted = spec.body !== undefined && spec.body.trim().length > 0;
   const answer = await vscode.window.showWarningMessage(
     `Write the new page to ${relative}?`,
     {
       modal: true,
       detail:
-        `It starts as “# ${title.trim()}” and the ${kind.label.toLowerCase()} headings — no prose. ` +
+        (drafted
+          ? 'It carries the draft you read, with the kind’s headings as its structure. '
+          : `It starts as “# ${title}” and the ${kind.label.toLowerCase()} headings — no prose. `) +
         'The repository’s own generator then gives it its registry entry: its area and chapter from that path, ' +
         'its title from that heading, and a place at the end of the chapter.',
     },
     'Write the page'
   );
   if (answer !== 'Write the page') {
-    return;
+    return undefined;
   }
 
+  const text = drafted ? withTitle(spec.body ?? '', title) : skeleton(title, kind);
   await ensureFolder(vscode.Uri.joinPath(uri, '..'));
-  await vscode.workspace.fs.writeFile(uri, Buffer.from(skeleton(title.trim(), kind), 'utf8'));
+  await vscode.workspace.fs.writeFile(uri, Buffer.from(text, 'utf8'));
   const document = await vscode.workspace.openTextDocument(uri);
   await vscode.window.showTextDocument(document, { preview: false, viewColumn: fileColumn() });
   deps.redraw();
@@ -318,6 +317,18 @@ async function createPage(deps: PageDeps, place: Place, chosen?: Kind): Promise<
     await runScript(deps.roots(), deps.output, 'docs:registry');
     deps.redraw();
   }
+  return { relative };
+}
+
+/**
+ * The text a draft becomes: the first line is `# <title>`, whatever the model wrote above it.
+ *
+ * The generator reads a new page's title from that heading, so a draft that opens with anything else would
+ * produce an untitled page. Exported because the New page page shows the same text it will write.
+ */
+export function withTitle(body: string, title: string): string {
+  const trimmed = body.trim();
+  return /^#\s+\S/.test(trimmed) ? `${trimmed}\n` : `# ${title}\n\n${trimmed}\n`;
 }
 
 /** The skeleton: the first `#` because the generator reads a new page's title from it, then the kind's headings. */
@@ -608,12 +619,6 @@ function placeOf(node: KnowledgeNode): Place | undefined {
   return undefined;
 }
 
-function areaOf(node: KnowledgeNode): { root: DocsRoot; area: string } | undefined {
-  const place = placeOf(node);
-  return place ? { root: place.root, area: place.area } : undefined;
-}
-
-/** A page that can be operated on: one in the tree, with a working tree behind it. */
 function requirePage(
   deps: PageDeps,
   node: KnowledgeNode | undefined
@@ -662,36 +667,6 @@ function findPage(roots: readonly DocsRoot[], id: string): { root: DocsRoot; pag
     }
   }
   return undefined;
-}
-
-async function chooseRoot(roots: readonly DocsRoot[]): Promise<DocsRoot | undefined> {
-  const local = roots.filter((root) => root.origin !== 'catalog');
-  if (local.length === 0) {
-    void vscode.window.showInformationMessage(
-      'Temco Knowledge: no folder on this machine is being read, so there is nothing to create a page in. ' +
-        'A source read over the API has no working tree.'
-    );
-    return undefined;
-  }
-  if (local.length === 1) {
-    return local[0];
-  }
-  const picked = await vscode.window.showQuickPick(
-    local.map((root) => ({ label: root.folder.name, description: root.rootUri.fsPath, root })),
-    { title: 'Which source?' }
-  );
-  return picked?.root;
-}
-
-async function chooseArea(root: DocsRoot): Promise<string | undefined> {
-  if (root.areas.length === 1) {
-    return root.areas[0].area;
-  }
-  const picked = await vscode.window.showQuickPick(
-    root.areas.map((area) => ({ label: area.area, description: `${String(area.pages)} pages`, area: area.area })),
-    { title: 'Which area?' }
-  );
-  return picked?.area;
 }
 
 function pageUri(root: DocsRoot, area: string, chapter: string, slug: string): vscode.Uri {

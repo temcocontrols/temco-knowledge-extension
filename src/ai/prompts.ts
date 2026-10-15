@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 
 /** Bumped whenever a file under `prompts/` changes, so a draft can be traced to the instructions behind it. */
-export const PROMPT_VERSION = 'ai-v2';
+export const PROMPT_VERSION = 'ai-v3';
 
 const TEMPLATE_FOLDER = 'prompts';
 const loaded = new Map<string, string>();
@@ -129,6 +129,28 @@ export function draftPrompt(
 ): string {
   const what = note.trim().length > 0 ? `${changes}\n\n# What the maintainer says\n\n${note.trim()}` : changes;
   return fill(template(context, 'draft'), { ...facts(page), changes: what });
+}
+
+/**
+ * A first draft of a **new** page, from material a person chose.
+ *
+ * This is the one prompt whose material may be a code file rather than documentation — the case where the page
+ * being written *is* about that file. The person picked it, the page shows the draft, and nothing is written
+ * until they accept it; that is what keeps this inside `12-ai-features.md`'s rule that the model makes the
+ * human's edit smaller rather than publishing on its own.
+ */
+export function newPagePrompt(
+  context: vscode.ExtensionContext,
+  page: { title: string; kind: string; headings: readonly string[]; path: string; area: string; material: string }
+): string {
+  return fill(template(context, 'newpage'), {
+    title: page.title,
+    kind: page.kind,
+    headings: page.headings.join(' · ') || '(none)',
+    path: page.path,
+    area: page.area.trim() || '(this is the first page here)',
+    material: page.material.trim() || '(nothing was chosen)',
+  });
 }
 
 /** A question that spans the pages of one area. */

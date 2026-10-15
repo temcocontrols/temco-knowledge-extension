@@ -178,6 +178,28 @@
 - **A source read over the API is refused a page write.** Its uri has no file system behind it (`temco-source`),
   so a page there would appear to be created and then fail. `newPage` and `newChapter` now say what the problem
   is instead of reaching for the file system, and reveal · terminal · copy say it too.
+- **The organisation's repositories are a row in the Library.** *Repositories* opens a page listing every
+  repository the `temcoKnowledge.organisation` setting names — description, language, when it was last pushed,
+  public or private — with a filter, and **Start** on each one: it adds the repository as a source of the project
+  being worked on and reads its own `docs/help/registry.json` over the API. No clone, nothing written to the
+  repository, and a private one needs the token `read.ts` already knew how to find. The project hub's *Add a
+  source* form and this page are two doors into the same act.
+- **A new page is a page, not three questions.** *New page*, *New chapter* and the kind entries open
+  `src/newPagePage.ts` instead of asking for the kind, the title and the file name in input boxes one at a time:
+  where it goes, what it is, the kinds' headings side by side, its name, **the exact file it will produce**, and
+  what to start the body from — nothing, the pages already in the area, one file of the source, or another page.
+  The confirmation still names the file, and `writePage()` in `src/pageOps.ts` is the one write behind it.
+- **A chapter is created by naming it once.** An empty folder is not a chapter in this registry, so the form
+  takes the chapter's name and writes the folder *and* its first page (`index.md`, titled with the same words)
+  rather than asking for two names and explaining which is which.
+- **The AI may draft a new page — from one file a person chose.** `prompts/newpage.md` is the one prompt whose
+  material may be code (a class, a header, a script), because the page being written is *about* that file: the
+  form lists the source's code files (`git/trees` for a repository, the disk for a folder), the model is given
+  that one file plus the kind's headings, and the draft is read before anything is written. That is the deliberate
+  exception to “prompts take documentation text, never code” — one file, one flow, chosen by hand, never a sweep —
+  and `12-ai-features.md`'s bargain still holds: the model makes the human's edit smaller.
+- **`src/repository.ts` is new**: the organisation's list, a source's code files, and one file's text — from a
+  folder or from a repository with no clone — with every refusal returned as a sentence to show, never thrown.
 - **The Workspace view's toolbar.** *New page* · *New chapter* · *Refresh* inline, and the rest in its `…`: the
   page acts, the kind submenu, the registry, Home and Validate. It is the Library's shape, and a `…` in a title
   bar opens **where it is** — which a list started from a row can never do.

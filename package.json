@@ -161,6 +161,11 @@
         "icon": "$(new-file)"
       },
       {
+        "command": "temcoKnowledge.repositories",
+        "title": "Repositories",
+        "icon": "$(github)"
+      },
+      {
         "command": "temcoKnowledge.feedback",
         "title": "Feedback by Owner",
         "icon": "$(comment-discussion)"
@@ -630,6 +635,11 @@
           "group": "5_ai@1"
         },
         {
+          "command": "temcoKnowledge.repositories",
+          "when": "view == temcoKnowledge.library",
+          "group": "1_read@4"
+        },
+        {
           "command": "temcoKnowledge.readAllSources",
           "when": "view == temcoKnowledge.library",
           "group": "1_read@1"
@@ -835,6 +845,16 @@
           "command": "temcoKnowledge.openAiPanel",
           "when": "view == temcoKnowledge.library && viewItem == ai",
           "group": "1_open@5"
+        },
+        {
+          "command": "temcoKnowledge.repositories",
+          "when": "view == temcoKnowledge.library && viewItem == repositories",
+          "group": "1_open@1"
+        },
+        {
+          "command": "temcoKnowledge.setToken",
+          "when": "view == temcoKnowledge.library && viewItem == repositories",
+          "group": "2_token@1"
         }
       ]
     },

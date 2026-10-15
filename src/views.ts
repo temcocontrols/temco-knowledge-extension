@@ -14,6 +14,12 @@ import { Selection } from './selected';
 
 export const LIBRARY_VIEW_ID = 'temcoKnowledge.library';
 
+/** The organisation the Repositories row names: a setting, with the default the platform was built for. */
+function organisation(): string {
+  const configured = vscode.workspace.getConfiguration('temcoKnowledge').get<string>('organisation');
+  return configured !== undefined && configured.trim().length > 0 ? configured.trim() : 'temcocontrols';
+}
+
 export class Row {
   constructor(
     readonly label: string,
@@ -403,6 +409,17 @@ class SectionView implements vscode.TreeDataProvider<Row> {
           sources.length === 0 ? 'none recorded yet' : String(sources.length),
           'repo',
           sourceRows
+        ),
+        // The step before *Sources*: what the organisation has, rather than what has been read. The row opens a
+        // page, because a list of forty repositories with their branches and a Start button each is a page and
+        // not a tree. Nothing is fetched until that page is open.
+        new Row(
+          'Repositories',
+          `${organisation()} · choose one to start`,
+          'github',
+          [],
+          { command: 'temcoKnowledge.repositories', args: [] },
+          'repositories'
         ),
         new Row(
           'Catalog',

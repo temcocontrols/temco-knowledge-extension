@@ -23,6 +23,8 @@ export const NEEDS_VIEW_TYPE = 'temcoKnowledge.needs';
 export const PROJECT_VIEW_TYPE = 'temcoKnowledge.project';
 export const HUB_VIEW_TYPE = 'temcoKnowledge.projectHub';
 export const AI_PAGE_VIEW_TYPE = 'temcoKnowledge.aiPage';
+export const REPOSITORIES_VIEW_TYPE = 'temcoKnowledge.repositories';
+export const NEW_PAGE_VIEW_TYPE = 'temcoKnowledge.newPage';
 
 /** Every view type this extension opens in the editor area shares this prefix. */
 const OUR_PREFIX = 'temcoKnowledge';

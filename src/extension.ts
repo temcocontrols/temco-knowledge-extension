@@ -18,12 +18,14 @@ import { registerFeedbackCommands } from './feedback';
 import { registerFormatCommands } from './format';
 import { HomePanel } from './home';
 import { NeedsPage } from './needsPage';
-import { PageOperations, registerPageCommands } from './pageOps';
+import { NewPagePage } from './newPagePage';
+import { PageDeps, PageOperations, registerPageCommands } from './pageOps';
 import { registerProjectCommands } from './project';
 import { registerProjectBuildCommands } from './projectBuild';
 import { slugOf } from './projectPage';
 import { registerReadCommands } from './read';
 import { registerReportCommands } from './report';
+import { RepositoriesPage } from './repositoriesPage';
 import { registerRowCommands } from './rowOps';
 import { registerScaffoldCommands } from './scaffold';
 import { Selection } from './selected';
@@ -55,12 +57,17 @@ export function activate(context: vscode.ExtensionContext): void {
   // The same holder trick, for the same reason: a page act can be started from the view's toolbar or from the
   // palette, where nothing names a row, and there the row the person has selected is the one they mean.
   let selectedRow = (): KnowledgeNode | undefined => undefined;
-  const pageOps = new PageOperations({
+  // And once more for the page that creates a page: every act that makes one opens it, and the page writes
+  // through the same dependencies the tree's own commands use — so there is one write, not two.
+  let newPagePage: NewPagePage | undefined;
+  const pageDeps: PageDeps = {
     roots: () => roots,
     output,
     redraw: () => redraw(),
     selected: () => selectedRow(),
-  });
+    newPagePage: (seed) => newPagePage?.open(seed),
+  };
+  const pageOps = new PageOperations(pageDeps);
 
   const treeView = vscode.window.createTreeView(VIEW_ID, {
     treeDataProvider: provider,
@@ -335,9 +342,17 @@ export function activate(context: vscode.ExtensionContext): void {
   registerFormatCommands(context, () => roots);
   // Operating on a page: creating one, naming it, moving it, retiring it. The selected row stands in for the
   // row a command was started without — the view's toolbar and the palette are the two that do that.
-  registerPageCommands(context, { roots: () => roots, output, redraw: () => redraw(), selected: () => selectedRow() });
+  registerPageCommands(context, pageDeps);
   // and where a row is: opening it, revealing it, a terminal at its folder, its path on the clipboard.
   registerRowCommands(context, { selected: () => selectedRow() });
+  // The two pages that exist because a name is asked for in a form and a list of forty repositories is not a
+  // tree: the organisation's repositories, and the page that creates a page.
+  const repositories = new RepositoriesPage(context, selection, () => void refresh());
+  newPagePage = new NewPagePage(context, () => roots, pageDeps);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('temcoKnowledge.repositories', () => repositories.open()),
+    { dispose: () => { repositories.dispose(); newPagePage?.dispose(); } }
+  );
   redraw = () => void refresh();
 
   context.subscriptions.push(

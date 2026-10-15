@@ -459,7 +459,7 @@ function parseRegistry(text: string, folder: string | undefined): { pages: PageI
 }
 
 /** The owner and repository a URL names, whether it is an https clone URL or a web address. */
-function coordinatesOf(remoteUrl: string): { owner: string; repo: string } | undefined {
+export function coordinatesOf(remoteUrl: string): { owner: string; repo: string } | undefined {
   const match = remoteUrl
     .replace(/\.git$/, '')
     .match(/github\.com[/:]([^/]+)\/([^/]+)$/);
@@ -467,7 +467,7 @@ function coordinatesOf(remoteUrl: string): { owner: string; repo: string } | und
 }
 
 /** The token: secret storage first, then the one the `gh` CLI already holds. */
-async function tokenOf(context: vscode.ExtensionContext): Promise<string | undefined> {
+export async function tokenOf(context: vscode.ExtensionContext): Promise<string | undefined> {
   const stored = await context.secrets.get(TOKEN_SECRET);
   if (stored && stored.trim().length > 0) {
     return stored.trim();
