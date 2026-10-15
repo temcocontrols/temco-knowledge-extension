@@ -126,7 +126,10 @@ export class AiPanel implements vscode.WebviewViewProvider {
         await this.apply();
         return;
       case 'models':
-        await vscode.commands.executeCommand('temcoKnowledge.models');
+        // The page, not the quick pick: choosing a model is downloading one, and that needs the page's room to
+        // read what each model needs. The quick pick stays where it belongs — behind its own command and the
+        // page's own "list a keyboard user gets" button.
+        await vscode.commands.executeCommand('temcoKnowledge.aiPage', 'downloads');
         this.refresh();
         return;
       case 'stop':

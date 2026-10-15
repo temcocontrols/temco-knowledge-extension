@@ -114,11 +114,6 @@
   the whole refresh, the tree data, the status bar, the start tab — never ran, while the views that were
   registered earlier kept working. The symptom was a Workspace view that stayed empty for two sessions. `npm run
   compile` now also runs `scripts/check-commands.mjs`, which fails the build if a command id is registered twice.
-- **Expand All, to go with Collapse All.** VS Code's tree gives a view one control — *Collapse All* — and
-  nothing that opens it again, so `temcoKnowledge.expandAll` is a button beside it in the Workspace title bar:
-  it re-reads the tree with every parent reported expanded. That is one render's worth on purpose — the next
-  read puts the view back into its normal shape (the only root's areas open, chapters closed) instead of
-  re-expanding a tree nobody asked about twice.
 - **The AI panel now has the shape VS Code's own chat has.** One composer at the bottom instead of a row of
   buttons: a rounded box holding the input, the actions as chips inside it (*Draft update* · *Ask the area* ·
   *Apply draft*), and a round send button. Above it, the page the answer will be about; below it, the runtime
@@ -140,6 +135,31 @@
   so it is a starting point rather than a question someone else chose. With no model installed the block ends
   with *No model is installed yet — Choose a model…*, because without one none of the rest can happen. It all
   disappears at the first turn, as before.
+
+- **“Choose a model” goes where the choosing happens.** The panel's model line — and the note saying nothing is
+  installed — used to open the *Models and Runtime* quick pick at the top of the window. It opens the **AI page
+  instead, scrolled to the downloads**, because choosing a model means downloading one: what each model needs has
+  to be readable before the choice is made. The quick pick is unchanged for keyboard use — its own command, and
+  the page's *The list a keyboard user gets* button.
+- **The AI page knows which machine it is on.** `src/ai/machine.ts` reads `process` and `os` — platform, CPU,
+  cores, memory — and the **Runtimes section opens with it**: an informational bar in the shape VS Code uses for
+  a message (*This machine — win32 x64 · 16 cores · 23 GB · 12th Gen Intel(R) Core(TM) i5-1240P*), which then
+  says what is marked. The runtime built for this platform and CPU, and the largest model the reported memory can
+  hold, are marked **suggested for this machine**. The rest of the list stays and every model says either that it
+  fits or how much memory it needs, so nothing is hidden and nothing is chosen for the user. It is stated once,
+  in the section it is about, rather than as a fifth item in the facts row.
+- **The folder path is one line.** *Where they live* takes the whole facts row and scrolls sideways rather than
+  wrapping: a path broken across four lines is unreadable, and its last segment — the one that matters — was the
+  part that fell off the end.
+- **The AI panel is reachable from the Library, with each menu doing its own job.** *Open the AI Panel*
+  (`temcoKnowledge.openAiPanel`) is a labelled entry in the Library's **More (⋯)** menu — a view-level action in
+  the view's own menu — and it is on the context menu of **The AI** row, beside the rest of that row's actions.
+  An item's menu carries that item's actions; a view's menu carries the view's.
+- **Needs attention reads at a glance.** The Library's first row carries a colour now, because it is the row a
+  person looks at before anything else: **red** when the count includes a fault (`problemsErrorIcon.foreground`),
+  **amber** when it is only warnings, stale pages, unowned pages or a declared-but-absent file, and a **green
+  tick** when the count is nothing at all. The declared-but-no-file row inside it is red too, since that is what
+  it is. The description still names each count, so the colour summarises the row rather than replacing it.
 
 ## 0.0.1
 

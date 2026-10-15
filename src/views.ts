@@ -35,7 +35,12 @@ export class Row {
      * Only a row the sidebar is *opened* for asks this — everything else waits to be clicked, because a tree
      * that opens itself everywhere is a wall of text. The person's own click always beats it.
      */
-    readonly expanded = false
+    readonly expanded = false,
+    /**
+     * A theme colour for the icon, when the row's meaning is a severity rather than a kind: a red fault, an
+     * amber something-to-look-at, a green nothing-at-all. Unset draws the icon in the ordinary foreground.
+     */
+    readonly colour?: string
   ) {}
 }
 
@@ -111,7 +116,9 @@ class SectionView implements vscode.TreeDataProvider<Row> {
   getTreeItem(row: Row): vscode.TreeItem {
     const item = new vscode.TreeItem(row.label, this.state(row));
     item.description = row.description;
-    item.iconPath = new vscode.ThemeIcon(row.icon);
+    item.iconPath = row.colour
+      ? new vscode.ThemeIcon(row.icon, new vscode.ThemeColor(row.colour))
+      : new vscode.ThemeIcon(row.icon);
     if (row.contextValue !== undefined) {
       item.contextValue = row.contextValue;
     }
@@ -216,7 +223,10 @@ class SectionView implements vscode.TreeDataProvider<Row> {
           'error',
           [],
           { command: 'temcoKnowledge.openRegistry', args: [] },
-          'missing'
+          'missing',
+          undefined,
+          false,
+          'problemsErrorIcon.foreground'
         )
       );
     }
@@ -249,6 +259,9 @@ class SectionView implements vscode.TreeDataProvider<Row> {
       )
     );
 
+    // Severity at a glance, because this row is read before anything else in the sidebar: **red** when something
+    // is a fault, **amber** when something merely wants looking at, and a **green tick** only when the count is
+    // nothing at all. The description still spells out which of those it is, term by term.
     const nothing = errors + warnings + stale + missing === 0;
     return new Row(
       'Needs attention',
@@ -263,10 +276,13 @@ class SectionView implements vscode.TreeDataProvider<Row> {
           ]
             .filter((part): part is string => part !== undefined)
             .join(' · '),
-      nothing ? 'pass' : 'warning',
+      errors > 0 ? 'error' : nothing ? 'pass' : 'warning',
       children,
       { command: 'temcoKnowledge.openNeeds', args: [] },
-      'needs'
+      'needs',
+      undefined,
+      false,
+      errors > 0 ? 'problemsErrorIcon.foreground' : nothing ? 'charts.green' : 'problemsWarningIcon.foreground'
     );
   }
 

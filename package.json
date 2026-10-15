@@ -76,11 +76,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "temcoKnowledge.expandAll",
-        "title": "Expand All",
-        "icon": "$(expand-all)"
-      },
-      {
         "command": "temcoKnowledge.home",
         "title": "Home",
         "icon": "$(home)"
@@ -124,6 +119,11 @@
         "command": "temcoKnowledge.aiStatus",
         "title": "AI Status",
         "icon": "$(pulse)"
+      },
+      {
+        "command": "temcoKnowledge.openAiPanel",
+        "title": "Open the AI Panel",
+        "icon": "$(comment-discussion)"
       },
       {
         "command": "temcoKnowledge.buildSite",
@@ -472,11 +472,6 @@
           "group": "navigation@2"
         },
         {
-          "command": "temcoKnowledge.expandAll",
-          "when": "view == temcoKnowledge.pages",
-          "group": "navigation@3"
-        },
-        {
           "command": "temcoKnowledge.newProject",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@0"
@@ -490,6 +485,11 @@
           "command": "temcoKnowledge.openNeeds",
           "when": "view == temcoKnowledge.library",
           "group": "navigation@2"
+        },
+        {
+          "command": "temcoKnowledge.openAiPanel",
+          "when": "view == temcoKnowledge.library",
+          "group": "5_ai@1"
         },
         {
           "command": "temcoKnowledge.readAllSources",
@@ -671,6 +671,11 @@
           "command": "temcoKnowledge.openModelFolder",
           "when": "view == temcoKnowledge.library && viewItem == ai",
           "group": "1_open@4"
+        },
+        {
+          "command": "temcoKnowledge.openAiPanel",
+          "when": "view == temcoKnowledge.library && viewItem == ai",
+          "group": "1_open@5"
         }
       ]
     },

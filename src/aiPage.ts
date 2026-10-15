@@ -8,11 +8,15 @@
 // project's pages; this is where the AI itself is set up, and both point at each other.
 
 import * as vscode from 'vscode';
-import { MODELS, RUNTIMES, entryById, formatBytes } from './ai/catalog';
+import { MODELS, RUNTIMES, entryById, formatBytes, runtimeFor } from './ai/catalog';
 import { install, installedArtifacts, modelRoot, uninstall } from './ai/install';
+import { bestModel, describeMachine, fitsModel, machine } from './ai/machine';
 import { PROMPT_VERSION } from './ai/prompts';
 import { aiStatus, showAiLog, startAiServer, stopAiServer } from './ai/runtime';
 import { AI_PAGE_VIEW_TYPE, pageColumn } from './surface';
+
+/** Somewhere on the page a caller can ask to be put: the list of what can be downloaded. */
+export type AiSection = 'downloads';
 
 interface AiPageMessage {
   type: 'ready' | 'download' | 'remove' | 'start' | 'stop' | 'folder' | 'log' | 'models' | 'apply' | 'panel' | 'dock';
@@ -24,10 +28,19 @@ interface AiPageMessage {
 export class AiPage {
   private panel: vscode.WebviewPanel | undefined;
   private busy = '';
+  /** Where to put the reader once the page has its data — `undefined` leaves them at the top. */
+  private wanted: AiSection | undefined;
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
-  open(): void {
+  /**
+   * Opens the page, or brings it forward.
+   *
+   * A caller that already knows what the reader came for passes it — "choose a model" means the downloads, not
+   * the top of a page about the AI in general.
+   */
+  open(section?: AiSection): void {
+    this.wanted = section;
     if (this.panel) {
       this.panel.reveal(pageColumn());
       void this.seed();
@@ -161,9 +174,13 @@ export class AiPage {
         path: artifact?.path,
         installedAt: artifact?.installedAt,
         busy: this.busy === entry.id,
+        suggested: entry.id === this.suggestions()[entry.kind],
+        fit: entry.kind === 'model' ? fitsModel(entry, this.machine).why : undefined,
       };
     };
 
+    const target = this.wanted;
+    this.wanted = undefined;
     await this.panel.webview.postMessage({
       type: 'ai',
       facts: {
@@ -172,6 +189,8 @@ export class AiPage {
         running: status.running ? `${status.running.baseUrl} (${status.running.label})` : undefined,
         promptVersion: PROMPT_VERSION,
         root: modelRoot(this.context),
+        machine: describeMachine(this.machine),
+        suggested: this.suggestions(),
         busy: this.busy === 'starting' ? 'starting the server' : undefined,
       },
       chosen: {
@@ -189,6 +208,30 @@ export class AiPage {
       runtimes: RUNTIMES.map(describe),
       models: MODELS.map(describe),
     });
+
+    // After the data, never before: the page has to have something to scroll to.
+    if (target !== undefined) {
+      await this.panel.webview.postMessage({ type: 'scroll', to: target });
+    }
+  }
+
+  /** This machine, read once for each pass over the catalog list. */
+  private get machine() {
+    return machine();
+  }
+
+  /**
+   * What to mark as the fit for this machine: the one runtime built for it, and the largest model it can hold.
+   *
+   * Both are answers about *this* computer, so they are read here rather than in the page: `process` and `os`
+   * are the extension host's, and a webview that guessed at them would be guessing at the user's own machine.
+   */
+  private suggestions(): { runtime?: string; model?: string } {
+    const here = this.machine;
+    return {
+      runtime: runtimeFor(here.platform, here.architecture)?.id,
+      model: bestModel(here)?.id,
+    };
   }
 }
 
@@ -216,6 +259,23 @@ function html(script: string): string {
     .facts div { border-left: 2px solid var(--vscode-panel-border); padding-left: .7em; min-width: 0; }
     .facts dt { color: var(--vscode-descriptionForeground); }
     .facts dd { margin: .1em 0 0; overflow-wrap: anywhere; }
+    /* A folder path is one line wide or it is unreadable: it takes the whole row and scrolls instead of wrapping. */
+    .facts .wide { grid-column: 1 / -1; }
+    .facts .wide dd { font-family: var(--vscode-editor-font-family); font-size: .95em;
+                      white-space: nowrap; overflow-x: auto; overflow-wrap: normal; }
+    .suggested { color: var(--vscode-charts-green, var(--vscode-descriptionForeground)); font-size: .9em; }
+    /* The machine, in the shape VS Code uses for an informational message: quieter than a card, louder than
+       the description text around it. */
+    .info { display: flex; gap: .7em; align-items: flex-start; max-width: 70em; margin: 0 0 .9em;
+            padding: .7em .9em; border-radius: 4px;
+            background: var(--vscode-inputValidation-infoBackground, var(--vscode-editorInfo-background, transparent));
+            border: 1px solid var(--vscode-inputValidation-infoBorder, var(--vscode-editorInfo-border, var(--vscode-panel-border))); }
+    .info svg { flex: 0 0 auto; width: 16px; height: 16px; margin-top: .15em; fill: none;
+                stroke: var(--vscode-editorInfo-foreground, var(--vscode-foreground)); stroke-width: 1.3;
+                stroke-linecap: round; }
+    .info h3 { margin: 0 0 .15em; }
+    .info p { margin: 0; color: var(--vscode-descriptionForeground); }
+    .info em { color: var(--vscode-charts-green, var(--vscode-descriptionForeground)); font-style: normal; }
     button { padding: .3em .8em; border: none; border-radius: 2px; cursor: pointer;
              font-family: inherit; font-size: inherit;
              color: var(--vscode-button-secondaryForeground);
@@ -283,13 +343,27 @@ function html(script: string): string {
   <h2>Installed on this machine</h2>
   <div id="installed"></div>
 
-  <h2>Runtimes</h2>
-  <p class="meta">A compiled inference engine is per-OS, which is why it is fetched rather than bundled.</p>
-  <div id="runtimes"></div>
+  <section id="downloads">
+    <h2>Runtimes</h2>
+    <p class="meta">A compiled inference engine is per-OS, which is why it is fetched rather than bundled.</p>
+    <div class="info">
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.4"/><path d="M8 7.3v3.9"/><path d="M8 4.7v.1"/>
+      </svg>
+      <div>
+        <h3>This machine</h3>
+        <p><span id="machineText">it could not be read</span> — the runtime built for it, and the largest model
+          its memory can hold, are the ones marked <em>suggested for this machine</em>.</p>
+      </div>
+    </div>
+    <div id="runtimes"></div>
 
-  <h2>Models</h2>
-  <p class="meta">Permissive licences only, and the licence is shown before anything is downloaded.</p>
-  <div id="models"></div>
+    <h2>Models</h2>
+    <p class="meta">Permissive licences only, and the licence is shown before anything is downloaded. Every
+      model is listed, with what it needs and what this machine offers — the one marked as suggested is the
+      largest it can hold.</p>
+    <div id="models"></div>
+  </section>
 
   <p class="foot" id="foot"></p>
 
@@ -302,8 +376,9 @@ let selection = { runtime: '', model: '' };
 $('dock').addEventListener('click', () => vscode.postMessage({ type: 'dock' }));
 $('panel').addEventListener('click', () => vscode.postMessage({ type: 'panel' }));
 
-function fact(label, value) {
+function fact(label, value, wide) {
   const div = document.createElement('div');
+  if (wide) { div.className = 'wide'; }
   const dt = document.createElement('dt');
   dt.textContent = label;
   const dd = document.createElement('dd');
@@ -339,9 +414,16 @@ function entryCard(entry, allowRemove) {
   const parts = [entry.licence, entry.size];
   if (entry.platform) { parts.push(entry.platform); }
   if (entry.needs) { parts.push(entry.needs); }
+  if (entry.fit && entry.suggested) { parts.push(entry.fit); }
   if (!entry.pinned) { parts.push('checksum not pinned'); }
   p.textContent = parts.join(' · ');
   body.append(h, p);
+  if (entry.fit && !entry.suggested) {
+    const why = document.createElement('p');
+    why.className = 'meta';
+    why.textContent = entry.fit;
+    body.append(why);
+  }
   if (entry.path) {
     const where = document.createElement('p');
     where.append(document.createTextNode('Installed: '));
@@ -352,6 +434,12 @@ function entryCard(entry, allowRemove) {
   }
   const side = document.createElement('div');
   side.className = 'side';
+  if (entry.suggested && !entry.installed) {
+    const pick = document.createElement('span');
+    pick.className = 'suggested';
+    pick.textContent = 'suggested for this machine';
+    side.append(pick);
+  }
   if (entry.installed) {
     const badge = document.createElement('span');
     badge.className = 'badge';
@@ -381,8 +469,9 @@ function render(data) {
     fact('Model', facts.model || 'none installed'),
     fact('Server', facts.busy || facts.running || 'not running'),
     fact('Instructions', facts.promptVersion),
-    fact('Where they live', facts.root)
+    fact('Where they live', facts.root, true)
   );
+  $('machineText').textContent = facts.machine || 'it could not be read';
 
   const controls = $('controls');
   if (data.facts.running) {
@@ -483,6 +572,11 @@ function render(data) {
 window.addEventListener('message', (event) => {
   if (event.data.type === 'ai') {
     render(event.data);
+  }
+  if (event.data.type === 'scroll') {
+    // Asked for a section: the page is long and "choose a model" means the downloads, not the top.
+    const target = document.getElementById(event.data.to);
+    if (target) { target.scrollIntoView({ block: 'start' }); }
   }
 });
 

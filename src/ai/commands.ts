@@ -22,7 +22,14 @@ interface Removal extends vscode.QuickPickItem {
 export function registerAiCommands(context: vscode.ExtensionContext): void {
   const page = new AiPage(context);
   context.subscriptions.push(
-    vscode.commands.registerCommand('temcoKnowledge.aiPage', () => page.open()),
+    // An argument from a caller that knows what the reader came for: the panel's "choose a model" means the
+    // downloads, so the page opens there rather than at its top.
+    vscode.commands.registerCommand('temcoKnowledge.aiPage', (section?: string) =>
+      page.open(section === 'downloads' ? 'downloads' : undefined)
+    ),
+    vscode.commands.registerCommand('temcoKnowledge.openAiPanel', () =>
+      vscode.commands.executeCommand(`${AI_VIEW}.focus`)
+    ),
     vscode.commands.registerCommand('temcoKnowledge.models', () => chooseModel(context)),
     vscode.commands.registerCommand('temcoKnowledge.removeModel', () => removeModel(context)),
     vscode.commands.registerCommand('temcoKnowledge.openModelFolder', async () => {

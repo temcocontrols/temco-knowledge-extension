@@ -24,6 +24,8 @@ export interface CatalogEntry {
   architecture?: string;
   /** Models only: what has to be installed, and roughly what it costs to run. */
   needs?: string;
+  /** Models only: the memory it needs, in GB — what `needs` says in words, in the form code can compare. */
+  needsGB?: number;
   notes?: string;
 }
 
@@ -130,6 +132,7 @@ export const MODELS: readonly CatalogEntry[] = [
     sha256: '',
     licence: 'Apache-2.0',
     needs: 'about 1.5 GB of RAM — the smallest that is still worth asking a question',
+    needsGB: 1.5,
     notes: 'checksum and size not pinned yet',
   },
   {
@@ -142,6 +145,7 @@ export const MODELS: readonly CatalogEntry[] = [
     sha256: '',
     licence: 'Apache-2.0',
     needs: 'about 3 GB of RAM — the model the application layout shows',
+    needsGB: 3,
     notes: 'checksum and size not pinned yet',
   },
   {
@@ -154,6 +158,7 @@ export const MODELS: readonly CatalogEntry[] = [
     sha256: '',
     licence: 'Apache-2.0',
     needs: 'about 6 GB of RAM — noticeably better prose, slower to load',
+    needsGB: 6,
     notes: 'checksum and size not pinned yet',
   },
 ];

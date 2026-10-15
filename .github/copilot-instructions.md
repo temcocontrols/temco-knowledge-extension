@@ -101,7 +101,11 @@ webview view (`temcoKnowledge.ai`) — and the commands, all named `temcoKnowled
 registered once**: a second `registerCommand` for the same id throws in the middle of activation and everything
 below it silently never runs, so `npm run compile` also runs `scripts/check-commands.mjs`. The Workspace view is
 about the project being worked on and never about the open folders, and it says why it is empty in **rows it
-draws itself** (`TreeNote` in `src/tree.ts`), not in a `viewsWelcome`. The Markdown toolbar lives in the
+draws itself** (`TreeNote` in `src/tree.ts`), not in a `viewsWelcome`.
+**Menus follow what they belong to** (the user's rule, 2026-10-15): a view-level action goes in the view's
+**More (⋯)** menu or its icon row (`view/title`), an item-level action on that item's own context menu
+(`view/item/context`, with a `viewItem` clause). Do not put an item's action on every row, and do not put a
+view-level one on a row. The Markdown toolbar lives in the
 editor's own menus (`editor/title`, `editor/context`) rather than in a page of its own:
 `docs/editor-design.md` says why.
 

@@ -88,25 +88,10 @@ export class KnowledgeTreeProvider implements vscode.TreeDataProvider<KnowledgeN
 
   private roots: DocsRoot[] = [];
   private notes: TreeNote[] = [];
-  /**
-   * True for one render after *Expand All*.
-   *
-   * VS Code's tree gives a view **Collapse All** and nothing that opens it again, so the opening half is ours:
-   * every parent reports itself expanded, the tree is re-read, and the next {@link setRoots} clears it — a later
-   * read puts the view back into its normal shape rather than re-expanding folders nobody asked about twice.
-   */
-  private open = false;
 
   setRoots(roots: DocsRoot[], notes: TreeNote[] = []): void {
     this.roots = roots;
     this.notes = notes;
-    this.open = false;
-    this.changed.fire();
-  }
-
-  /** Opens every node once — see {@link open}. */
-  expandAll(): void {
-    this.open = true;
     this.changed.fire();
   }
 
@@ -119,18 +104,15 @@ export class KnowledgeTreeProvider implements vscode.TreeDataProvider<KnowledgeN
       case 'folder':
         return folderItem(node);
       case 'area':
-        return areaItem(node, this.open);
+        return areaItem(node);
       case 'chapter':
-        return chapterItem(node, this.open);
+        return chapterItem(node);
       case 'page':
-        return pageItem(node, this.open);
+        return pageItem(node);
       case 'issue':
         return issueItem(node);
       case 'gaps': {
-        const item = new vscode.TreeItem(
-          `Gaps (${node.count})`,
-          this.open ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed
-        );
+        const item = new vscode.TreeItem(`Gaps (${node.count})`, vscode.TreeItemCollapsibleState.Collapsed);
         item.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('problemsWarningIcon.foreground'));
         item.tooltip = 'Every page with a structural problem, across all open repositories.';
         return item;
@@ -213,12 +195,12 @@ function folderItem(node: FolderNode): vscode.TreeItem {
   return item;
 }
 
-function areaItem(node: AreaNode, open: boolean): vscode.TreeItem {
+function areaItem(node: AreaNode): vscode.TreeItem {
   const { area } = node;
   const item = new vscode.TreeItem(
     area.title,
     area.chapters.length > 0
-      ? open || node.top
+      ? node.top
         ? vscode.TreeItemCollapsibleState.Expanded
         : vscode.TreeItemCollapsibleState.Collapsed
       : vscode.TreeItemCollapsibleState.None
@@ -246,13 +228,11 @@ function areaItem(node: AreaNode, open: boolean): vscode.TreeItem {
   return item;
 }
 
-function chapterItem(node: ChapterNode, open: boolean): vscode.TreeItem {
+function chapterItem(node: ChapterNode): vscode.TreeItem {
   const item = new vscode.TreeItem(
     node.chapter.chapter,
     node.chapter.pages.length > 0
-      ? open
-        ? vscode.TreeItemCollapsibleState.Expanded
-        : vscode.TreeItemCollapsibleState.Collapsed
+      ? vscode.TreeItemCollapsibleState.Collapsed
       : vscode.TreeItemCollapsibleState.None
   );
   item.description = `${node.chapter.pages.length}`;
@@ -261,17 +241,13 @@ function chapterItem(node: ChapterNode, open: boolean): vscode.TreeItem {
   return item;
 }
 
-function pageItem(node: PageNode, open: boolean): vscode.TreeItem {
+function pageItem(node: PageNode): vscode.TreeItem {
   const { page } = node;
   const recorded = page.origin === 'catalog';
   const stale = page.provenance?.stale === true;
   const item = new vscode.TreeItem(
     page.title,
-    page.issues.length > 0
-      ? open
-        ? vscode.TreeItemCollapsibleState.Expanded
-        : vscode.TreeItemCollapsibleState.Collapsed
-      : vscode.TreeItemCollapsibleState.None
+    page.issues.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None
   );
   item.id = `${node.root.folder.name}:${page.id}`;
 
