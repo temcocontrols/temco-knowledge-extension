@@ -76,7 +76,8 @@ src/report.ts        the staleness report, grouped by owner (Markdown, untitled,
 src/scaffold.ts      starts a registry in an open folder that has none (smallest valid file, confirmed)
 src/feedback.ts      feedback rows routed to their owner, against a proposed file shape
 src/format.ts        the Markdown toolbar: formatting, blocks, a link to a real page, the outline
-src/pageOps.ts       operating on a page: create · rename the title · move · retire · the drag controller
+src/pageOps.ts       operating on a page: create · rename the title · move · retire · the drag controller —
+                     and `writePage()`, the one write that makes a page, which the New page page calls
 src/rowOps.ts        where a row is rather than what it writes: reveal in the OS · a terminal · copy a path
 src/registryEdit.ts  writing one named value of registry.json, in its own generator's shape
 src/selected.ts      which project is being worked on, and which page of it (workspaceState)
@@ -84,6 +85,9 @@ src/surface.ts       the one-tab-group rule — ViewColumn is named only here
 src/home.ts          the dashboard · src/projectsPage.ts the list · src/projectHub.ts one project
 src/projectPage.ts   create or edit a project · src/needsPage.ts what needs doing · src/aiPage.ts the AI
 src/read.ts          reading a source (local · api) and recording what it found
+src/repository.ts    the repository side of a source: the organisation's list · its code files · one file's text
+src/newPagePage.ts   the form that creates a page (where · what · kind · name · what to draft from · preview)
+src/repositoriesPage.ts  the organisation's repositories, and *Start* on one: cite it, then read it
 src/catalog/         schema.ts (the tables) · store.ts (node:sqlite, in the extension's own storage,
                      never in a repository) · commands.ts (the catalog status)
 src/ai/              catalog.ts (what can be downloaded), install.ts (download/verify/unpack),
@@ -91,7 +95,8 @@ src/ai/              catalog.ts (what can be downloaded), install.ts (download/v
                      history.ts (the commit range), citations.ts (what an answer pointed at),
                      panel.ts (the AI panel), commands.ts (the model list + AI status)
 media/               knowledge.svg (the activity-bar icon); ai-panel.js/.css (the AI panel)
-prompts/             the instruction text the AI receives (system.md, ask.md, draft.md, area.md)
+prompts/             the instruction text the AI receives (system.md, ask.md, draft.md, area.md,
+                     newpage.md — the one prompt whose material may be a code file)
 docs/                this repository's docs; docs/design/help-platform/ is the platform design
 ```
 

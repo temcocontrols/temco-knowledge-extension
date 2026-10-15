@@ -113,6 +113,8 @@ already owns.**
 | `temcoKnowledge.buildHelp` | invokes the non-deploying help build (`build:help:dry`) and reports the CHM it produced |
 | `temcoKnowledge.stalenessReport` | opens the report of what is owed as an untitled Markdown document — nothing is written |
 | `temcoKnowledge.startRegistry` | creates the smallest valid `docs/help/registry.json` in an open folder that has none, after a confirmation — and is also the Content view's empty state |
+| `temcoKnowledge.repositories` | opens the organisation's repositories as a page — every repository the `organisation` setting names, with **Start** on each: cite it in the project being worked on, then read its registry over the API. The library's *Repositories* row opens it |
+| `temcoKnowledge.newPage` · `newChapter` · the five kind commands | open the **New page page** (`src/newPagePage.ts`) with the row's place and, for a kind, its kind already chosen. The page writes through `writePage()` — one write, one confirmation that names the file |
 | `temcoKnowledge.feedback` | reads each repository's `docs/help/feedback.json`, routes the rows to their owners, and calls out the aging |
 
 Where they surface: the **Workspace view's title bar** carries *New page*, *New chapter* and *Refresh* inline,
